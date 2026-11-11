@@ -1,0 +1,15 @@
+# Food Label Verification System — Requirements
+# Core API & Server
+flask>=3.0.0
+flask-cors>=4.0.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+werkzeug>=3.0.0
+
+# Computer Vision & Image Processing
+opencv-python>=4.8.0
+
+# Numerical & Data Processing
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0

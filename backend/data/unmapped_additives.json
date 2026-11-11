@@ -1,0 +1,107 @@
+[
+  {
+    "timestamp": "2026-10-28T13:44:15.663919+00:00",
+    "context_identifier": "AuditTest",
+    "unmapped_tokens": [
+      "INS 9999_UNKNOWN"
+    ],
+    "raw_text_snippet": "",
+    "parser_confidence": 0.7,
+    "audit_status": "PENDING_EXPERT_REVIEW"
+  },
+  {
+    "timestamp": "2026-10-28T13:44:59.937916+00:00",
+    "context_identifier": "AuditTest",
+    "unmapped_tokens": [
+      "INS 9999_UNKNOWN"
+    ],
+    "raw_text_snippet": "",
+    "parser_confidence": 0.7,
+    "audit_status": "PENDING_EXPERT_REVIEW"
+  },
+  {
+    "timestamp": "2026-10-28T13:45:13.360707+00:00",
+    "context_identifier": "AuditTest",
+    "unmapped_tokens": [
+      "INS 9999_UNKNOWN"
+    ],
+    "raw_text_snippet": "",
+    "parser_confidence": 0.7,
+    "audit_status": "PENDING_EXPERT_REVIEW"
+  },
+  {
+    "timestamp": "2026-10-28T13:49:12.925615+00:00",
+    "context_identifier": "AuditTest",
+    "unmapped_tokens": [
+      "INS 9999_UNKNOWN"
+    ],
+    "raw_text_snippet": "",
+    "parser_confidence": 0.7,
+    "audit_status": "PENDING_EXPERT_REVIEW"
+  },
+  {
+    "timestamp": "2026-10-28T13:49:32.031467+00:00",
+    "context_identifier": "Direct Ingredient Scan",
+    "unmapped_tokens": [
+      "INS 9999"
+    ],
+    "raw_text_snippet": "Water, sugar, INS 9999_MYSTERY",
+    "parser_confidence": 0.7,
+    "audit_status": "PENDING_EXPERT_REVIEW"
+  },
+  {
+    "timestamp": "2026-10-28T14:00:24.326620+00:00",
+    "context_identifier": "Direct Ingredient Scan",
+    "unmapped_tokens": [
+      "INS 8888"
+    ],
+    "raw_text_snippet": "Water, INS 8888_UNKNOWN_CHEMICAL",
+    "parser_confidence": 0.7,
+    "audit_status": "PENDING_EXPERT_REVIEW"
+  },
+  {
+    "timestamp": "2026-10-28T14:16:39.277710+00:00",
+    "context_identifier": "8901725132224",
+    "unmapped_tokens": [
+      "INS 500(I)",
+      "INS 501(I)",
+      "INS 451(I)"
+    ],
+    "raw_text_snippet": "Refined wheat flour, palm oil, salt, wheat gluten, INS 508, INS 412, INS 500(i), INS 501(i), INS 451(i), INS 627, INS 631.",
+    "parser_confidence": 0.86,
+    "audit_status": "PENDING_EXPERT_REVIEW"
+  },
+  {
+    "id": "audit_1793613947",
+    "timestamp": "2026-11-02T10:05:47.162658+00:00",
+    "context_identifier": "DedupeTest",
+    "unmapped_tokens": [
+      "INS 9999_DEDUP_TEST"
+    ],
+    "raw_text_snippet": "",
+    "additive_match_confidence": 0.7,
+    "ocr_confidence": 1.0,
+    "flag_reasons": [
+      "1 unrecognised additive token(s): INS 9999_DEDUP_TEST",
+      "Low additive matching confidence: 70% (threshold 75%)"
+    ],
+    "audit_status": "PENDING_EXPERT_REVIEW",
+    "review_history": []
+  },
+  {
+    "id": "audit_1793944301285",
+    "timestamp": "2026-11-06T05:51:41.285782+00:00",
+    "context_identifier": "Direct Ingredient Scan",
+    "unmapped_tokens": [
+      "INS 150"
+    ],
+    "raw_text_snippet": "Water, sugar, INS 150, acidity regulator INS 330",
+    "additive_match_confidence": 0.82,
+    "ocr_confidence": 0.95,
+    "flag_reasons": [
+      "1 unrecognised additive token(s): INS 150"
+    ],
+    "audit_status": "PENDING_EXPERT_REVIEW",
+    "review_history": []
+  }
+]

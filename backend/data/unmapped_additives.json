@@ -103,5 +103,23 @@
     ],
     "audit_status": "PENDING_EXPERT_REVIEW",
     "review_history": []
+  },
+  {
+    "id": "audit_1794378508585",
+    "timestamp": "2026-11-11T06:28:28.585590+00:00",
+    "context_identifier": "Manual Ingredient Formulation",
+    "unmapped_tokens": [
+      "INS 501(I)",
+      "INS 500(I)",
+      "INS 451(I)"
+    ],
+    "raw_text_snippet": "Ingredients: Refined Wheat Flour (Maida), Palm Oil, Salt, Wheat Gluten, Mineral (Calcium Carbonate), Thickeners (INS 508, INS 412), Acidity Regulators (INS 501(i), INS 500(i), INS 451(i)). Noodle Tastemaker: Hydrolysed Peanut Protein, Mixed Spices (15.5%) (Onion Powder, Coriander Powder, Chilli Powd",
+    "additive_match_confidence": 0.84,
+    "ocr_confidence": 1.0,
+    "flag_reasons": [
+      "3 unrecognised additive token(s): INS 501(I), INS 500(I), INS 451(I)"
+    ],
+    "audit_status": "PENDING_EXPERT_REVIEW",
+    "review_history": []
   }
 ]

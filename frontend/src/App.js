@@ -147,24 +147,34 @@ function App() {
   };
 
   // Handler: OCR processing for camera captures and uploaded images
-  const handleOcrImage = async (imageSrc, isUpload = false) => {
+  const handleOcrImage = async (imageSrc, isUpload = false, ocrConfig = "B") => {
     setLoading(true);
     setErrorMessage("");
     try {
       let ocrInput = imageSrc;
+      let configUsed = ocrConfig;
+      let preprocessingMetrics = null;
 
-      // Attempt OpenCV backend preprocessing (Laplacian blur + CLAHE enhancement)
-      try {
-        const prepRes = await preprocessOcrImage(imageSrc);
-        if (prepRes && prepRes.enhanced_image_base64) {
-          ocrInput = prepRes.enhanced_image_base64;
+      if (ocrConfig === "B") {
+        // Configuration B: Attempt OpenCV backend preprocessing (Laplacian blur + CLAHE + Sharpening)
+        try {
+          const prepRes = await preprocessOcrImage(imageSrc, "B", "best");
+          if (prepRes && prepRes.enhanced_image_base64) {
+            ocrInput = prepRes.enhanced_image_base64;
+            configUsed = prepRes.configuration_used || "B";
+            preprocessingMetrics = prepRes.quality_metrics || null;
+          }
+        } catch (prepErr) {
+          console.warn("Backend OpenCV preprocessing bypassed, using client canvas fallback:", prepErr);
+          ocrInput = await preprocessImageForOcr(imageSrc, isUpload);
+          configUsed = "B (Client Fallback)";
         }
-      } catch (prepErr) {
-        console.warn("Backend OpenCV preprocessing bypassed, using client canvas fallback:", prepErr);
-        ocrInput = await preprocessImageForOcr(imageSrc, isUpload);
+      } else {
+        // Configuration A: Existing OCR directly on original image
+        configUsed = "A (Original)";
       }
 
-      // Perform OCR with Tesseract.js
+      // Perform OCR with Tesseract.js using standard configuration
       const worker = await Tesseract.createWorker("eng", 1);
       await worker.setParameters({
         tessedit_pageseg_mode: "6",
@@ -189,7 +199,9 @@ function App() {
         product: {
           name: isUpload ? "Uploaded Packaging Scan" : "Live Camera Capture",
           brand: "Scanned Label",
-          category: "Physical Label OCR"
+          category: "Physical Label OCR",
+          ocr_pipeline_config: configUsed,
+          preprocessing_metrics: preprocessingMetrics
         }
       });
     } catch (err) {

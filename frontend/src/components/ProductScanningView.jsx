@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import Webcam from "react-webcam";
 import Icon from "./Icons";
+import OcrComparisonModal from "./OcrComparisonModal";
 
 // Modulo-10 checksum validation for standard EAN-13 codes
 const validateEan13 = (code) => {
@@ -66,6 +67,8 @@ export default function ProductScanningView({
 
   // Text state
   const [manualText, setManualText] = useState("");
+  const [ocrConfig, setOcrConfig] = useState("B"); // 'B' (Improved OpenCV) | 'A' (Standard Raw)
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   // Optional Barcode state
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -169,13 +172,13 @@ export default function ProductScanningView({
   const handleTriggerAnalysis = () => {
     if (activeScanMode === "camera") {
       if (capturedImage) {
-        onAnalyzeOcr(capturedImage, false);
+        onAnalyzeOcr(capturedImage, false, ocrConfig);
       } else {
         // Snap immediately and analyze
         if (webcamRef.current) {
           const shot = webcamRef.current.getScreenshot();
           if (shot) {
-            onAnalyzeOcr(shot, false);
+            onAnalyzeOcr(shot, false, ocrConfig);
           } else {
             setCameraError("Please capture an image of the ingredient label first.");
           }
@@ -186,7 +189,7 @@ export default function ProductScanningView({
         setUploadError("Please select or drop an image of the food label first.");
         return;
       }
-      onAnalyzeOcr(uploadedImage, true);
+      onAnalyzeOcr(uploadedImage, true, ocrConfig);
     } else if (activeScanMode === "text") {
       if (!manualText.trim()) return;
       onAnalyzeManualText(manualText.trim());
@@ -243,6 +246,37 @@ export default function ProductScanningView({
             <span className="tab-title">Ingredient Text</span>
             <span className="tab-sub">Paste or test formulation</span>
           </div>
+        </button>
+      </div>
+
+      {/* OCR Pipeline Configuration Selector (Config A vs Config B) */}
+      <div className="ocr-config-selector-bar">
+        <span className="config-selector-label">OCR Pipeline:</span>
+        <button
+          type="button"
+          className={`config-pill-btn ${ocrConfig === "B" ? "active" : ""}`}
+          onClick={() => setOcrConfig("B")}
+          title="Configuration B: OpenCV CLAHE + Unsharp Masking + Tesseract (Recommended)"
+        >
+          <Icon name="sparkles" size={14} color={ocrConfig === "B" ? "#059669" : "#64748b"} />
+          <span>Config B: Improved (OpenCV + Tesseract)</span>
+        </button>
+        <button
+          type="button"
+          className={`config-pill-btn ${ocrConfig === "A" ? "active" : ""}`}
+          onClick={() => setOcrConfig("A")}
+          title="Configuration A: Original Image -> Tesseract directly"
+        >
+          <span>Config A: Standard (Raw Tesseract)</span>
+        </button>
+        <button
+          type="button"
+          className="config-pill-btn comp-btn"
+          onClick={() => setShowComparisonModal(true)}
+          title="Inspect Comparative Evaluation & Benchmark Metrics (CER / WER / F1)"
+        >
+          <Icon name="sliders" size={14} color="#2563eb" />
+          <span>Benchmark & Compare</span>
         </button>
       </div>
 
@@ -625,6 +659,21 @@ export default function ProductScanningView({
           </div>
         </div>
       )}
+
+      {/* OCR Comparison & Benchmark Modal */}
+      <OcrComparisonModal
+        isOpen={showComparisonModal}
+        onClose={() => setShowComparisonModal(false)}
+        activeImage={
+          activeScanMode === "camera"
+            ? capturedImage
+            : activeScanMode === "upload"
+            ? uploadedImage
+            : null
+        }
+        activeMode={activeScanMode}
+        ocrConfig={ocrConfig}
+      />
     </div>
   );
 }

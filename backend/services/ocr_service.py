@@ -17,16 +17,25 @@ from typing import Tuple, Dict, Any, List, Optional
 import cv2
 import numpy as np
 
+from services.ocr.image_preprocessor import (
+    ImagePreprocessor,
+    PreprocessedImageBundle,
+    decode_image_input,
+    assess_image_quality,
+    preprocess_label_image,
+    BLUR_THRESHOLD,
+    MIN_RECOMMENDED_WIDTH,
+    MIN_RECOMMENDED_HEIGHT
+)
+from services.ocr.ocr_pipeline import (
+    OcrPipeline,
+    prepare_ocr_image
+)
+
 logger = logging.getLogger(__name__)
 
-# Blurriness threshold: Laplacian variance < 70.0 is considered blurry
-BLUR_THRESHOLD = 70.0
-
-# Minimum resolution recommendation
-MIN_RECOMMENDED_WIDTH = 1000
-MIN_RECOMMENDED_HEIGHT = 800
-
 # Boundary markers that typically terminate the ingredients section on packaging
+# SECTION TERMINATORS defined below
 SECTION_TERMINATORS = [
     r"\bnutrition(?:al)?\s*(?:facts|info|information)?\b",
     r"\bmfg(?:\.|\s+date)?\b",
@@ -45,140 +54,6 @@ SECTION_TERMINATORS = [
     r"\bfor\s+feedback\b",
     r"\bbar\s*code\b"
 ]
-
-
-def decode_image_input(image_input: Any) -> Optional[np.ndarray]:
-    """
-    Decodes an image from bytes, bytearray, base64 string, or existing numpy array.
-    Returns BGR numpy array or None on failure.
-    """
-    if image_input is None:
-        return None
-
-    if isinstance(image_input, np.ndarray):
-        return image_input
-
-    try:
-        raw_bytes = None
-        if isinstance(image_input, (bytes, bytearray)):
-            raw_bytes = bytes(image_input)
-        elif isinstance(image_input, str):
-            clean_str = image_input.strip()
-            if "," in clean_str:
-                clean_str = clean_str.split(",", 1)[1]
-            raw_bytes = base64.b64decode(clean_str)
-
-        if raw_bytes:
-            nparr = np.frombuffer(raw_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            return img
-    except Exception as e:
-        logger.warning("Failed to decode image input: %s", str(e))
-
-    return None
-
-
-def assess_image_quality(img: np.ndarray) -> Dict[str, Any]:
-    """
-    Evaluates image sharpness (Laplacian variance), illumination uniformity,
-    and dimensions for OCR suitability.
-    """
-    if img is None or img.size == 0:
-        return {
-            "is_valid": False,
-            "blur_score": 0.0,
-            "is_blurry": True,
-            "lighting_uniformity": 0.0,
-            "is_uneven_lighting": True,
-            "dimensions": (0, 0),
-            "quality_grade": "Unusable"
-        }
-
-    h, w = img.shape[:2]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
-
-    # 1. Sharpness via Laplacian variance
-    lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    is_blurry = lap_var < BLUR_THRESHOLD
-
-    # 2. Lighting uniformity across 4 quadrants
-    mid_y, mid_x = h // 2, w // 2
-    quadrants = [
-        gray[:mid_y, :mid_x],
-        gray[:mid_y, mid_x:],
-        gray[mid_y:, :mid_x],
-        gray[mid_y:, mid_x:]
-    ]
-    quad_means = [float(np.mean(q)) for q in quadrants if q.size > 0]
-    lighting_std = float(np.std(quad_means)) if quad_means else 0.0
-    is_uneven = lighting_std > 35.0  # High standard deviation between quadrants
-
-    # 3. Overall quality grade
-    if is_blurry or w < 400 or h < 300:
-        grade = "Low" if lap_var > 40.0 else "Unusable"
-    elif is_uneven or w < MIN_RECOMMENDED_WIDTH:
-        grade = "Adequate"
-    else:
-        grade = "High"
-
-    return {
-        "is_valid": True,
-        "blur_score": round(lap_var, 2),
-        "is_blurry": is_blurry,
-        "lighting_uniformity_score": round(max(0.0, 100.0 - lighting_std * 2), 1),
-        "is_uneven_lighting": is_uneven,
-        "dimensions": (w, h),
-        "quality_grade": grade
-    }
-
-
-def preprocess_label_image(
-    image_input: Any,
-    upscale_small: bool = True
-) -> Tuple[Optional[np.ndarray], Dict[str, Any]]:
-    """
-    Performs full computer vision preprocessing on a food package image:
-      1. Image decoding and validation
-      2. Quality assessment (sharpness, lighting)
-      3. Resolution normalization (upscaling small packaging labels)
-      4. CLAHE contrast enhancement for curved/glossy surfaces
-      5. Unsharp masking to sharpen small ingredient fonts
-    Returns: (preprocessed_grayscale_image, quality_metrics)
-    """
-    img = decode_image_input(image_input)
-    if img is None:
-        return None, {"is_valid": False, "error": "Invalid or unreadable image data"}
-
-    metrics = assess_image_quality(img)
-    h, w = img.shape[:2]
-
-    # Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
-
-    # Resolution upscaling for small packaging labels
-    if upscale_small and (w < MIN_RECOMMENDED_WIDTH or h < MIN_RECOMMENDED_HEIGHT):
-        scale_x = max(1.0, MIN_RECOMMENDED_WIDTH / max(1, w))
-        scale_y = max(1.0, MIN_RECOMMENDED_HEIGHT / max(1, h))
-        scale = max(scale_x, scale_y)
-        if scale > 1.1:
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            gray = cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
-            metrics["upscaled"] = True
-            metrics["processed_dimensions"] = (new_w, new_h)
-    else:
-        metrics["upscaled"] = False
-        metrics["processed_dimensions"] = (w, h)
-
-    # Adaptive Contrast Enhancement (CLAHE) - handles curved packaging shadows
-    clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
-    contrast_enhanced = clahe.apply(gray)
-
-    # Unsharp Masking for small font crispness
-    blurred = cv2.GaussianBlur(contrast_enhanced, (0, 0), sigmaX=3.0)
-    sharpened = cv2.addWeighted(contrast_enhanced, 1.4, blurred, -0.4, 0)
-
-    return sharpened, metrics
 
 
 def identify_ingredient_section(raw_text: str) -> Dict[str, Any]:

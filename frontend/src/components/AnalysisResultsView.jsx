@@ -42,6 +42,9 @@ export default function AnalysisResultsView({
   const additiveConfidence = conf.additive_match_confidence !== undefined ? Math.round(conf.additive_match_confidence * 100) : null;
   const barcodeStatus = conf.barcode_decode_status || "not_provided";
 
+  const ocrPipelineConfig = product.ocr_pipeline_config || analysisResult.ocr_pipeline_config || null;
+  const preprocessingMetrics = product.preprocessing_metrics || analysisResult.preprocessing_metrics || null;
+
   const getScoreTheme = (score, hasAllergen) => {
     if (hasAllergen) return { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", status: "Allergen Warning" };
     if (score >= 90) return { color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", status: "High Compatibility" };
@@ -102,6 +105,21 @@ export default function AnalysisResultsView({
                 <span className="source-pill physical-source">
                   <Icon name="camera" size={14} />
                   <span>Physical Packaging Label OCR</span>
+                </span>
+              )}
+              {product.ocr_pipeline_config && (
+                <span
+                  className="source-pill"
+                  style={{
+                    marginLeft: "0.5rem",
+                    backgroundColor: product.ocr_pipeline_config.includes("B") ? "#ecfdf5" : "#f1f5f9",
+                    color: product.ocr_pipeline_config.includes("B") ? "#065f46" : "#475569",
+                    border: "1px solid",
+                    borderColor: product.ocr_pipeline_config.includes("B") ? "#a7f3d0" : "#cbd5e1"
+                  }}
+                >
+                  <Icon name="sparkles" size={13} color={product.ocr_pipeline_config.includes("B") ? "#059669" : "#64748b"} />
+                  <span>{product.ocr_pipeline_config.includes("B") ? "Config B: OpenCV + Tesseract" : "Config A: Raw Tesseract"}</span>
                 </span>
               )}
             </div>
@@ -498,6 +516,35 @@ export default function AnalysisResultsView({
             </span>
           </div>
         </div>
+
+        {(ocrPipelineConfig || preprocessingMetrics) && (
+          <div className="ocr-pipeline-meta-banner">
+            <div className="pipeline-meta-header">
+              <Icon name="sliders" size={16} color="#475569" />
+              <span>
+                <strong>OCR Pipeline:</strong> {ocrPipelineConfig || "Configuration B (OpenCV + Tesseract)"}
+              </span>
+            </div>
+            {preprocessingMetrics && (
+              <div className="pipeline-meta-badges">
+                <span className="pipeline-pill">
+                  Sharpness: {Math.round(preprocessingMetrics.sharpness_score || 0)}
+                  {preprocessingMetrics.is_blurry ? " (Blurry)" : " (Clear)"}
+                </span>
+                <span className="pipeline-pill">
+                  Lighting: {Math.round((preprocessingMetrics.lighting_uniformity || 0) * 100)}%
+                  {preprocessingMetrics.has_uneven_lighting ? " (Uneven)" : " (Uniform)"}
+                </span>
+                {preprocessingMetrics.original_dims && (
+                  <span className="pipeline-pill">
+                    Dims: {preprocessingMetrics.original_dims[0]}×{preprocessingMetrics.original_dims[1]}
+                    {preprocessingMetrics.upscaled ? " (Scaled)" : ""}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* SECTION F: EXPANDABLE DETAILED INFORMATION */}

@@ -82,12 +82,15 @@ from services.personal_scoring import (
 )
 from services.ocr_service import (
     preprocess_label_image,
+    prepare_ocr_image,
     identify_ingredient_section,
     clean_and_separate_ingredients,
     evaluate_ocr_quality_and_safety_gate,
     assess_image_quality,
     decode_image_input
 )
+from services.ocr.ocr_comparator import compare_ocr_results
+from services.ocr.ins_evaluator import run_benchmark_suite, evaluate_single_sample
 
 logging.basicConfig(
     level=logging.INFO,
@@ -307,6 +310,10 @@ def analyze_v1():
                 "found":         False,
                 "lookup_status": "not_provided"
             }
+            if custom_product.get("ocr_pipeline_config") or data.get("ocr_pipeline_config"):
+                product_info["ocr_pipeline_config"] = custom_product.get("ocr_pipeline_config") or data.get("ocr_pipeline_config")
+            if custom_product.get("preprocessing_metrics") or data.get("preprocessing_metrics"):
+                product_info["preprocessing_metrics"] = custom_product.get("preprocessing_metrics") or data.get("preprocessing_metrics")
             effective_ocr_conf = ocr_confidence  # OCR text from frontend
 
         # --- 2. Module 1: INS Taxonomy Parsing & Ingredient Section Identification ---
@@ -505,7 +512,11 @@ def analyze_v1():
                 "valid_ean13":   is_valid_ean,
                 "found_in_db":   product_found,
                 "lookup_status": product_info.get("lookup_status", "not_provided"),
+                "ocr_pipeline_config": product_info.get("ocr_pipeline_config"),
+                "preprocessing_metrics": product_info.get("preprocessing_metrics"),
             },
+            "ocr_pipeline_config": product_info.get("ocr_pipeline_config"),
+            "preprocessing_metrics": product_info.get("preprocessing_metrics"),
             "parsed_additives": cleaned_additives,
             "unmapped_tokens": unmapped_tokens,
             "safety_indicator": {
@@ -899,35 +910,45 @@ def ocr_preprocess_endpoint():
     """
     Computer Vision Preprocessing Endpoint:
     Assesses image blur (Laplacian variance), lighting uniformity, and dimensions.
-    Applies CLAHE contrast enhancement and unsharp masking.
-    Accepts: multipart/form-data with 'image' OR JSON { 'image_base64': '...' }
+    Supports Configuration A (Original image) vs. Configuration B (Improved OpenCV Preprocessed).
+    Accepts: multipart/form-data with 'image' OR JSON { 'image_base64': '...', 'config': 'A'|'B', 'variant': 'best' }
     """
     if request.method == "OPTIONS":
         return "", 200
 
     img_bytes = None
+    config = "B"
+    variant = "best"
+
     if "image" in request.files:
         img_bytes = request.files["image"].read()
+        config = request.form.get("config", "B")
+        variant = request.form.get("variant", "best")
     else:
         body = request.get_json(silent=True) or {}
         img_bytes = body.get("image_base64") or body.get("image")
+        config = body.get("config", "B")
+        variant = body.get("variant", "best")
 
     if not img_bytes:
         return jsonify({"error": "Bad Request", "message": "No image data provided"}), 400
 
-    enhanced_img, metrics = preprocess_label_image(img_bytes)
-    if enhanced_img is None:
-        return jsonify({"error": "Processing Error", "message": metrics.get("error", "Failed to preprocess image")}), 400
-
-    # Encode enhanced image as JPEG base64 for preview/debug
-    import cv2
-    _, buffer = cv2.imencode(".jpg", enhanced_img)
-    enhanced_base64 = base64.b64encode(buffer).decode("utf-8")
+    res = prepare_ocr_image(img_bytes, config=config, variant=variant)
+    if not res.get("is_valid", False):
+        return jsonify({
+            "error": "Processing Error",
+            "message": res.get("error", "Failed to preprocess image")
+        }), 400
 
     return jsonify({
         "status": "success",
-        "quality_metrics": metrics,
-        "enhanced_image_base64": f"data:image/jpeg;base64,{enhanced_base64}"
+        "configuration_used": res.get("configuration_used", "B"),
+        "fallback_applied": res.get("fallback_applied", False),
+        "candidate_name": res.get("candidate_name", "sharpened"),
+        "quality_metrics": res.get("quality_metrics", {}),
+        "timings_ms": res.get("timings_ms", {}),
+        "enhanced_image_base64": res.get("target_image_base64"),
+        "original_image_base64": res.get("original_image_base64")
     }), 200
 
 
@@ -955,6 +976,144 @@ def ocr_extract_section_endpoint():
         "separated_count": len(separated_ingredients),
         "ocr_safety": ocr_safety
     }), 200
+
+
+@app.route("/api/v1/ocr/compare", methods=["POST", "OPTIONS"])
+def ocr_compare_endpoint():
+    """
+    OCR Comparison Mode Endpoint (Phase 4):
+    Compares Configuration A (Original Image) vs. Configuration B (OpenCV Preprocessed Image).
+    Accepts:
+      - JSON with { text_a, text_b, confidence_a, confidence_b, timings_a, timings_b }
+      OR
+      - Image input (image_base64) to prepare both Config A and Config B image representations.
+    """
+    if request.method == "OPTIONS":
+        return "", 200
+
+    body = request.get_json(silent=True) or {}
+    image_input = body.get("image_base64") or body.get("image")
+
+    prepared_images = {}
+    quality_metrics = None
+    if image_input:
+        res_a = prepare_ocr_image(image_input, config="A")
+        if not res_a.get("is_valid", False):
+            return jsonify({
+                "status": "error",
+                "error": res_a.get("error", "Failed to prepare image under Configuration A"),
+                "configuration": "A"
+            }), 400
+
+        res_b = prepare_ocr_image(image_input, config="B")
+        if not res_b.get("is_valid", False):
+            return jsonify({
+                "status": "error",
+                "error": res_b.get("error", "Failed to prepare image under Configuration B"),
+                "configuration": "B"
+            }), 400
+
+        quality_metrics = res_b.get("quality_metrics", {})
+        prepared_images = {
+            "config_a_image_base64": res_a.get("target_image_base64"),
+            "config_b_image_base64": res_b.get("target_image_base64"),
+            "candidate_name": res_b.get("candidate_name")
+        }
+
+    text_a = (body.get("text_a") or "").strip()
+    text_b = (body.get("text_b") or "").strip()
+    conf_a = body.get("confidence_a")
+    conf_b = body.get("confidence_b")
+    timings_a = body.get("timings_a")
+    timings_b = body.get("timings_b")
+
+    # Image-only request: return prepared image representations without dummy empty-string comparison
+    if image_input and not text_a and not text_b:
+        return jsonify({
+            "status": "prepared",
+            "message": "Image representations prepared successfully under both configurations.",
+            "prepared_images": prepared_images,
+            "quality_metrics": quality_metrics
+        }), 200
+
+    if not text_a and not text_b:
+        return jsonify({
+            "status": "error",
+            "error": "No OCR text provided for comparison. Please provide 'text_a' and 'text_b'."
+        }), 400
+
+    result = compare_ocr_results(
+        text_a=text_a,
+        text_b=text_b,
+        confidence_a=conf_a,
+        confidence_b=conf_b,
+        timings_a=timings_a,
+        timings_b=timings_b,
+        quality_metrics=quality_metrics
+    )
+
+    if prepared_images:
+        result["prepared_images"] = prepared_images
+
+    return jsonify(result), 200
+
+
+@app.route("/api/v1/ocr/benchmark", methods=["GET", "OPTIONS"])
+def ocr_benchmark_endpoint():
+    """
+    INS Detection Accuracy & Quality Evaluation Benchmark (Phase 5):
+    Returns empirical evaluation metrics (CER, WER, Precision, Recall, F1-score)
+    comparing Configuration A and Configuration B across standard food label scenarios.
+    """
+    if request.method == "OPTIONS":
+        return "", 200
+
+    report = run_benchmark_suite()
+    return jsonify(report), 200
+
+
+@app.route("/api/v1/ocr/evaluate", methods=["POST", "OPTIONS"])
+def ocr_evaluate_sample_endpoint():
+    """
+    Evaluates a custom or single label sample against reference ground truth.
+    POST body:
+      {
+        "sample_id": "CUSTOM-01",
+        "label_category": "Snack Label",
+        "ground_truth_text": "...",
+        "ground_truth_codes": ["102", "330"],
+        "text_a": "...",
+        "text_b": "...",
+        "confidence_a": 0.85,
+        "confidence_b": 0.90
+      }
+    """
+    if request.method == "OPTIONS":
+        return "", 200
+
+    body = request.get_json(silent=True) or {}
+    sample_id = body.get("sample_id", "CUSTOM-SAMPLE")
+    category = body.get("label_category", "Custom Packaging")
+    gt_text = body.get("ground_truth_text", "")
+    gt_codes = body.get("ground_truth_codes", [])
+    text_a = body.get("text_a", "")
+    text_b = body.get("text_b", "")
+    conf_a = float(body.get("confidence_a", 0.8))
+    conf_b = float(body.get("confidence_b", 0.8))
+
+    eval_result = evaluate_single_sample(
+        sample_id=sample_id,
+        label_category=category,
+        ground_truth_text=gt_text,
+        ground_truth_codes=gt_codes,
+        text_a=text_a,
+        text_b=text_b,
+        confidence_a=conf_a,
+        confidence_b=conf_b,
+        timings_a=body.get("timings_a"),
+        timings_b=body.get("timings_b")
+    )
+    return jsonify({"status": "success", "evaluation": eval_result}), 200
 
 
 # ---------------------------------------------------------------------------

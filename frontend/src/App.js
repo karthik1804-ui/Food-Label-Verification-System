@@ -1,58 +1,35 @@
 import React, { useState, useEffect } from "react";
 import Tesseract from "tesseract.js";
-import { analyzePayload, fetchCurrentUser, logoutUser, preprocessOcrImage } from "./api";
-import BarcodeScanner from "./components/BarcodeScanner";
-import SafetyScoreCard from "./components/SafetyScoreCard";
-import ShapAttributionChart from "./components/ShapAttributionChart";
-import CounterfactualCard from "./components/CounterfactualCard";
-import ConfidencePanel from "./components/ConfidencePanel";
-import CameraScanner from "./components/CameraScanner";
-import ImageUpload from "./components/ImageUpload";
-import IngredientTextInput from "./components/IngredientTextInput";
+import {
+  analyzePayload,
+  fetchCurrentUser,
+  logoutUser,
+  preprocessOcrImage
+} from "./api";
+
+// Modern UI Components
+import Icon from "./components/Icons";
+import StepProgressBar from "./components/StepProgressBar";
+import AuthCard from "./components/AuthCard";
+import DietaryPreferencesView from "./components/DietaryPreferencesView";
+import ProductScanningView from "./components/ProductScanningView";
+import AnalysisResultsView from "./components/AnalysisResultsView";
+import AnalysisHistoryView from "./components/AnalysisHistoryView";
 import AuditQueueModal from "./components/AuditQueueModal";
-import AuthModal from "./components/AuthModal";
-import DietaryProfileModal from "./components/DietaryProfileModal";
-import PersonalisedScoreCard from "./components/PersonalisedScoreCard";
-import AnalysisHistoryModal from "./components/AnalysisHistoryModal";
+
 import "./style.css";
 
 // Compute mean word-level confidence from Tesseract result (0.0–1.0)
 const computeOcrConfidence = (tesseractData) => {
   const words = tesseractData?.words || [];
   if (words.length === 0) return 1.0;
-  const validWords = words.filter(w => w.confidence > 0);
+  const validWords = words.filter((w) => w.confidence > 0);
   if (validWords.length === 0) return 0.5;
   const mean = validWords.reduce((sum, w) => sum + w.confidence, 0) / validWords.length;
-  return Math.round((mean / 100) * 1000) / 1000; // 0.0–1.0, 3 decimal places
+  return Math.round((mean / 100) * 1000) / 1000;
 };
 
-// Helper function to crop the center region (center 70%) of captured camera frame
-const cropCenterImage = (imageSrc) => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const margin = 0.15;
-      const cropX = img.width * margin;
-      const cropY = img.height * margin;
-      const cropWidth = img.width * (1 - 2 * margin);
-      const cropHeight = img.height * (1 - 2 * margin);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = cropWidth;
-      canvas.height = cropHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(imageSrc);
-
-      ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-      resolve(canvas.toDataURL("image/jpeg", 0.95));
-    };
-    img.onerror = () => resolve(imageSrc);
-    img.src = imageSrc;
-  });
-};
-
-// Canvas preprocessing for OCR enhancement
+// Canvas preprocessing for OCR enhancement (client fallback)
 const preprocessImageForOcr = (imageSrc, isUpload) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -79,7 +56,6 @@ const preprocessImageForOcr = (imageSrc, isUpload) => {
       if (!ctx) return resolve(imageSrc);
 
       ctx.drawImage(img, 0, 0, width, height);
-
       const imgData = ctx.getImageData(0, 0, width, height);
       const data = imgData.data;
       const orig = new Uint8ClampedArray(data);
@@ -98,10 +74,11 @@ const preprocessImageForOcr = (imageSrc, isUpload) => {
           const right = idx + 4;
 
           for (let c = 0; c < 3; c++) {
-            const sharp = centerWeight * orig[idx + c] +
+            const sharp =
+              centerWeight * orig[idx + c] +
               neighborWeight * (orig[up + c] + orig[down + c] + orig[left + c] + orig[right + c]);
-            const val = ((sharp * brightness) - 127.5) * contrast + 127.5;
-            data[idx + c] = val < 0 ? 0 : (val > 255 ? 255 : val);
+            const val = (sharp * brightness - 127.5) * contrast + 127.5;
+            data[idx + c] = val < 0 ? 0 : val > 255 ? 255 : val;
           }
         }
       }
@@ -115,18 +92,20 @@ const preprocessImageForOcr = (imageSrc, isUpload) => {
 };
 
 function App() {
-  const [activeTab, setActiveTab] = useState("barcode");
+  // Navigation & 4-Step Journey State
+  // Steps: 1 = Account, 2 = Preferences, 3 = Scan, 4 = Results
+  const [currentStep, setCurrentStep] = useState(3);
+  const [currentView, setCurrentView] = useState("flow"); // 'flow' | 'history'
+  const [showAuditModal, setShowAuditModal] = useState(false);
+
+  // Authentication & Dietary Profile
+  const [currentUser, setCurrentUser] = useState(null);
+  const [dietaryProfile, setDietaryProfile] = useState(null);
+
+  // Analysis State
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [showAuditModal, setShowAuditModal] = useState(false);
-
-  // Authentication & Dietary Profile state
-  const [currentUser, setCurrentUser] = useState(null);
-  const [dietaryProfile, setDietaryProfile] = useState(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Auto-hydrate session from token on mount
   useEffect(() => {
@@ -142,12 +121,7 @@ function App() {
       });
   }, []);
 
-  // Initial load demo with benchmark product
-  useEffect(() => {
-    handleRunAnalysis({ ean: "8901234567890" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // Handler: Run full backend verification payload
   const handleRunAnalysis = async (payload) => {
     setLoading(true);
     setErrorMessage("");
@@ -158,41 +132,39 @@ function App() {
       };
       const data = await analyzePayload(fullPayload);
       setAnalysisResult(data);
+      setCurrentView("flow");
+      setCurrentStep(4); // Advance to Step 4: Personalised Results
     } catch (err) {
       console.error("Analysis failure:", err);
-      const msg = err.response?.data?.message || err.message || "Failed to complete analysis. Is Flask server running?";
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        "Analysis could not be completed. Please ensure the backend server is active.";
       setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  // Handler: OCR processing for camera captures and uploaded images
   const handleOcrImage = async (imageSrc, isUpload = false) => {
     setLoading(true);
     setErrorMessage("");
     try {
-      let finalImg = imageSrc;
-      if (!isUpload) {
-        finalImg = await cropCenterImage(imageSrc);
-      }
+      let ocrInput = imageSrc;
 
-      // Try OpenCV backend preprocessing first (Laplacian blur detection + CLAHE contrast enhancement)
-      let ocrInput = finalImg;
+      // Attempt OpenCV backend preprocessing (Laplacian blur + CLAHE enhancement)
       try {
-        const prepRes = await preprocessOcrImage(finalImg);
-        if (prepRes && prepRes.quality_metrics) {
-          if (prepRes.quality_metrics.is_blurry) {
-            console.warn(`Laplacian blur detected (variance: ${prepRes.quality_metrics.blur_score}). Image may be out of focus.`);
-          }
-          if (prepRes.enhanced_image_base64) {
-            ocrInput = prepRes.enhanced_image_base64;
-          }
+        const prepRes = await preprocessOcrImage(imageSrc);
+        if (prepRes && prepRes.enhanced_image_base64) {
+          ocrInput = prepRes.enhanced_image_base64;
         }
       } catch (prepErr) {
-        console.warn("Backend OpenCV preprocessing skipped, falling back to client canvas:", prepErr);
-        ocrInput = await preprocessImageForOcr(finalImg, isUpload);
+        console.warn("Backend OpenCV preprocessing bypassed, using client canvas fallback:", prepErr);
+        ocrInput = await preprocessImageForOcr(imageSrc, isUpload);
       }
 
+      // Perform OCR with Tesseract.js
       const worker = await Tesseract.createWorker("eng", 1);
       await worker.setParameters({
         tessedit_pageseg_mode: "6",
@@ -204,14 +176,12 @@ function App() {
 
       const extracted = res.data.text;
       if (!extracted || !extracted.trim()) {
-        setErrorMessage("No legible text recognized from image. Please ensure packaging is well-lit.");
+        setErrorMessage("No legible text could be recognized. Please ensure label is well-lit and in focus.");
         setLoading(false);
         return;
       }
 
-      // Compute and forward Tesseract word-level confidence to backend
       const ocrConfidence = computeOcrConfidence(res.data);
-      console.log(`OCR confidence: ${(ocrConfidence * 100).toFixed(1)}%`);
 
       await handleRunAnalysis({
         text: extracted,
@@ -219,7 +189,7 @@ function App() {
         product: {
           name: isUpload ? "Uploaded Packaging Scan" : "Live Camera Capture",
           brand: "Scanned Label",
-          category: "Visual OCR Inspection"
+          category: "Physical Label OCR"
         }
       });
     } catch (err) {
@@ -230,387 +200,285 @@ function App() {
     }
   };
 
+  // Handler: Barcode lookup analysis
+  const handleBarcodeAnalyze = async (barcode) => {
+    await handleRunAnalysis({ ean: barcode });
+  };
+
+  // Handler: Manual ingredient text analysis
+  const handleManualTextAnalyze = async (text) => {
+    await handleRunAnalysis({
+      text,
+      ocr_confidence: 1.0,
+      product: {
+        name: "Manual Ingredient Formulation",
+        brand: "Direct Entry",
+        category: "Direct Formulation Check"
+      }
+    });
+  };
+
+  // Handler: Sign out
+  const handleSignOut = async () => {
+    try {
+      await logoutUser();
+    } catch {
+      // Ignored
+    } finally {
+      setCurrentUser(null);
+      setDietaryProfile(null);
+      setCurrentStep(1);
+    }
+  };
+
   return (
-    <div className="app dark-theme">
+    <div className="app">
       {/* Navigation Header */}
       <nav className="navbar">
         <div className="navbar-container">
-          <div className="navbar-brand">
-            <span className="brand-logo">🔬</span>
+          <div
+            className="navbar-brand"
+            onClick={() => {
+              setCurrentView("flow");
+              setCurrentStep(analysisResult ? 4 : 3);
+            }}
+          >
+            <div className="brand-icon-wrapper">
+              <Icon name="shieldCheck" size={24} color="#059669" />
+            </div>
             <div>
               <span className="brand-name">Food Label Verification System</span>
               <span className="brand-tagline">Multimodal Deep Learning & Dietary Verification</span>
             </div>
           </div>
 
-          <div className="navbar-actions">
+          <div className="navbar-nav-links">
+            <button
+              type="button"
+              className={`nav-link-btn ${currentView === "flow" && (currentStep === 3 || currentStep === 4) ? "active" : ""}`}
+              onClick={() => {
+                setCurrentView("flow");
+                setCurrentStep(analysisResult ? 4 : 3);
+              }}
+            >
+              <Icon name="camera" size={16} />
+              <span>Scan Product</span>
+            </button>
+
+            <button
+              type="button"
+              className={`nav-link-btn ${currentView === "flow" && currentStep === 2 ? "active" : ""}`}
+              onClick={() => {
+                setCurrentView("flow");
+                setCurrentStep(2);
+              }}
+            >
+              <Icon name="sliders" size={16} />
+              <span>Preferences</span>
+            </button>
+
+            <button
+              type="button"
+              className={`nav-link-btn ${currentView === "history" ? "active" : ""}`}
+              onClick={() => {
+                setCurrentView("history");
+              }}
+            >
+              <Icon name="history" size={16} />
+              <span>History</span>
+            </button>
+
+            <button
+              type="button"
+              className="nav-link-btn"
+              onClick={() => setShowAuditModal(true)}
+              title="Human-in-the-Loop review queue for unmapped additives"
+            >
+              <Icon name="clipboardList" size={16} />
+              <span>HITL Audit</span>
+            </button>
+          </div>
+
+          <div className="navbar-user-actions">
             {currentUser ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontSize: "0.85rem", color: "#e2e8f0" }}>
-                  👤 <strong>{currentUser.username}</strong>
-                </span>
+              <div className="user-badge-pill">
+                <Icon name="user" size={15} color="#059669" />
+                <span>{currentUser.username}</span>
                 {dietaryProfile?.preset_name && (
-                  <span style={{
-                    fontSize: "0.72rem",
-                    padding: "0.2rem 0.5rem",
-                    borderRadius: "12px",
-                    backgroundColor: "#1e3a8a",
-                    color: "#93c5fd",
-                    textTransform: "capitalize"
-                  }}>
+                  <span className="user-preset-badge">
                     {dietaryProfile.preset_name.replace("_", " ")}
                   </span>
                 )}
                 <button
-                  className="btn btn-outline"
-                  onClick={() => setShowProfileModal(true)}
-                  title="Configure dietary restrictions & allergens"
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={handleSignOut}
+                  title="Sign out of account"
+                  style={{ padding: "0.15rem 0.35rem", marginLeft: "0.25rem" }}
                 >
-                  🥗 Dietary Profile
-                </button>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setShowHistoryModal(true)}
-                  title="View past scans"
-                >
-                  📜 History
-                </button>
-                <button
-                  className="btn btn-outline"
-                  onClick={async () => {
-                    await logoutUser();
-                    setCurrentUser(null);
-                    setDietaryProfile(null);
-                  }}
-                >
-                  Sign Out
+                  <Icon name="logOut" size={14} />
                 </button>
               </div>
             ) : (
               <button
-                className="btn btn-primary"
-                onClick={() => setShowAuthModal(true)}
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  setCurrentView("flow");
+                  setCurrentStep(1);
+                }}
               >
-                Sign In / Register
+                <Icon name="user" size={14} />
+                <span>Sign In / Register</span>
               </button>
             )}
-
-            <button
-              className="btn btn-outline"
-              onClick={() => setShowAuditModal(true)}
-            >
-              📋 HITL Audit Queue
-            </button>
-            <div className="service-status-pill">
-              <span className="status-dot"></span>
-              <span>API Active</span>
-            </div>
           </div>
         </div>
       </nav>
 
-      {/* Global Toast */}
+      {/* Global Error Banner */}
       {errorMessage && (
-        <div className="error-toast-container">
-          <div className="error-toast card glass">
-            <div className="error-toast-content">
-              <span>⚠️</span>
-              <p>{errorMessage}</p>
-            </div>
-            <button className="close-toast-btn" onClick={() => setErrorMessage("")}>&times;</button>
+        <div style={{ maxWidth: 1200, margin: "1rem auto 0 auto", padding: "0 1.5rem" }}>
+          <div className="alert-banner alert-danger">
+            <Icon name="alertTriangle" size={18} />
+            <span style={{ flex: 1 }}>{errorMessage}</span>
+            <button
+              type="button"
+              onClick={() => setErrorMessage("")}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "inherit" }}
+            >
+              <Icon name="x" size={16} />
+            </button>
           </div>
         </div>
       )}
 
-      {/* Main Content Layout */}
+      {/* 4-Step Workflow Progress Indicator */}
+      {currentView === "flow" && (
+        <StepProgressBar
+          currentStep={currentStep}
+          onSelectStep={(stepNum) => setCurrentStep(stepNum)}
+          currentUser={currentUser}
+        />
+      )}
+
+      {/* Main Dynamic View Content */}
       <main className="main-content">
-        {/* Hero Banner */}
-        <section className="hero">
-          <h1 className="hero-title">Food Label Verification System</h1>
-          <p className="hero-subtitle">
-            Evaluating food additives, nutrient density, and chemical hazards with transparent rule-based feature deductions, decoupled product identity, and personalised dietary assessments.
-          </p>
-        </section>
-
-        {/* Input Method Selector Tabs */}
-        <div className="tab-control-container">
-          <button
-            className={`tab-btn ${activeTab === "barcode" ? "active" : ""}`}
-            onClick={() => setActiveTab("barcode")}
-          >
-            🏷️ EAN-13 Barcode
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "camera" ? "active" : ""}`}
-            onClick={() => setActiveTab("camera")}
-          >
-            📷 Live Camera Scanner
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "upload" ? "active" : ""}`}
-            onClick={() => setActiveTab("upload")}
-          >
-            📁 Upload Packaging Image
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "text" ? "active" : ""}`}
-            onClick={() => setActiveTab("text")}
-          >
-            📝 Ingredient Text
-          </button>
-        </div>
-
-        {/* Active Input Panel */}
-        <div className="input-active-panel">
-          {activeTab === "barcode" && (
-            <BarcodeScanner onAnalyze={handleRunAnalysis} loading={loading} />
-          )}
-
-          {activeTab === "camera" && (
-            <CameraScanner
-              onCapture={(src) => handleOcrImage(src, false)}
-              onCameraError={(err) => setErrorMessage(err)}
-              loading={loading}
-            />
-          )}
-
-          {activeTab === "upload" && (
-            <ImageUpload processImage={(src) => handleOcrImage(src, true)} loading={loading} />
-          )}
-
-          {activeTab === "text" && (
-            <IngredientTextInput onAnalyze={handleRunAnalysis} loading={loading} />
-          )}
-        </div>
-
-        {/* Loading Indicator */}
-        {loading && (
-          <div className="loading-container glass card">
-            <div className="spinner"></div>
-            <p>Evaluating chemical taxonomy, computing rule-based deductions, and optimizing counterfactuals...</p>
-          </div>
-        )}
-
-        {/* Results Dashboard Grid */}
-        {analysisResult && !loading && (
-          <div className="dashboard-results">
-            {/* Top Row: Universal Safety Indicator & Counterfactual */}
-            <div className="results-top-grid">
-              <SafetyScoreCard
-                safetyScoring={analysisResult.safety_indicator || analysisResult.safety_scoring}
-                product={analysisResult.product}
-              />
-              <CounterfactualCard
-                counterfactual={analysisResult.counterfactual_explanation}
-                currentScore={(analysisResult.safety_indicator || analysisResult.safety_scoring)?.final_score || 0}
-              />
-            </div>
-
-            {/* Personalised Dietary Evaluation & Allergen Alert */}
-            {analysisResult.personal_evaluation && (
-              <PersonalisedScoreCard
-                personalEvaluation={analysisResult.personal_evaluation}
-                onOpenProfileModal={() => setShowProfileModal(true)}
+        {currentView === "history" ? (
+          <AnalysisHistoryView
+            onSelectScanRecord={(record) => {
+              // Convert history record to analysis result format and view in Step 4
+              setAnalysisResult({
+                product: {
+                  name: record.product_name,
+                  brand: record.brand,
+                  ean: record.ean,
+                  category: record.category || "Past Scan Record"
+                },
+                personal_evaluation: {
+                  personal_score: record.personal_score !== undefined ? record.personal_score : record.safety_score,
+                  personal_verdict: record.personal_verdict || "Compatible",
+                  allergen_alerts: record.allergen_alerts || [],
+                  preference_conflicts: record.preference_conflicts || [],
+                  caution_items: record.caution_items || [],
+                  preset_name: record.preset_name || "custom"
+                },
+                safety_indicator: {
+                  final_score: record.safety_score || record.personal_score || 95,
+                  grade: record.grade || "A",
+                  base_baseline_score: 100,
+                  score_deductions: []
+                },
+                system_audit: record.system_audit || {
+                  confidence: {
+                    ocr_confidence: record.ocr_confidence || 1.0,
+                    additive_match_confidence: 1.0,
+                    barcode_decode_status: record.ean ? "valid_ean13" : "not_provided"
+                  }
+                },
+                parsed_additives: record.parsed_additives || []
+              });
+              setCurrentView("flow");
+              setCurrentStep(4);
+            }}
+            onBackToScan={() => {
+              setCurrentView("flow");
+              setCurrentStep(3);
+            }}
+          />
+        ) : (
+          <>
+            {/* STEP 1: ACCOUNT CREATION / LOGIN */}
+            {currentStep === 1 && (
+              <AuthCard
+                currentUser={currentUser}
+                onAuthSuccess={(user, profile) => {
+                  setCurrentUser(user);
+                  setDietaryProfile(profile);
+                  // Advance to Step 2
+                  setCurrentStep(2);
+                }}
+                onContinueAsGuest={() => {
+                  setCurrentStep(2);
+                }}
+                onSignOut={handleSignOut}
               />
             )}
 
-            {/* Middle Row: Rule-Based Deductions */}
-            <ShapAttributionChart
-              deductions={(analysisResult.safety_indicator || analysisResult.safety_scoring)?.score_deductions}
-            />
+            {/* STEP 2: DIETARY PREFERENCE SELECTION */}
+            {currentStep === 2 && (
+              <DietaryPreferencesView
+                currentProfile={dietaryProfile}
+                currentUser={currentUser}
+                onProfileSaved={(prof) => {
+                  setDietaryProfile(prof);
+                }}
+                onProceedToScan={() => {
+                  setCurrentStep(3);
+                }}
+              />
+            )}
 
-            {/* Confidence Panel (v2.0 — 4 dimensions) */}
-            <ConfidencePanel systemAudit={analysisResult.system_audit} />
+            {/* STEP 3: PRODUCT SCANNING */}
+            {currentStep === 3 && (
+              <ProductScanningView
+                loading={loading}
+                dietaryProfile={dietaryProfile}
+                onAnalyzeOcr={handleOcrImage}
+                onAnalyzeBarcode={handleBarcodeAnalyze}
+                onAnalyzeManualText={handleManualTextAnalyze}
+              />
+            )}
 
-            {/* Bottom Row: Parsed Additives Table */}
-            <div className="card glass additives-table-card">
-              <div className="card-header">
-                <span className="card-icon">🧪</span>
-                <div>
-                  <h2>Parsed INS / E-Number Additives & Categories</h2>
-                  <p className="card-sub">
-                    Mapped from verified taxonomy. Regulatory info, functional categories, and ambiguity status.
-                  </p>
-                </div>
-              </div>
-
-              {/* Functional Categories Breakdown Chips */}
-              {analysisResult.detected_categories && Object.keys(analysisResult.detected_categories).length > 0 && (
-                <div className="category-breakdown-bar">
-                  <span style={{ fontSize: "0.78rem", color: "#94a3b8", display: "flex", alignItems: "center", marginRight: "4px" }}>
-                    CATEGORIES:
-                  </span>
-                  {Object.entries(analysisResult.detected_categories).map(([cat, codes]) => (
-                    <span key={cat} className="category-badge-chip">
-                      <strong>{cat}</strong> ({codes.length})
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Individual INS Codes Found */}
-              {analysisResult.individual_ins_codes && analysisResult.individual_ins_codes.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", marginBottom: "1rem" }}>
-                  <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>INS BADGES:</span>
-                  {analysisResult.individual_ins_codes.map((code) => (
-                    <span key={code} className="ins-code-pill">
-                      INS {code}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Ambiguous Detections Notice */}
-              {analysisResult.ambiguous_detections && analysisResult.ambiguous_detections.length > 0 && (
-                <div className="ambiguous-alert-banner">
-                  <strong>⚠️ Ambiguous Additive Notice: </strong>
-                  The formulation contains general or unnumbered additive classes:{" "}
-                  {analysisResult.ambiguous_detections.map(a => `${a.matched_term || a.code} (${a.warning || a.code})`).join("; ")}
-                </div>
-              )}
-
-              {/* Duplicate Detections Notice */}
-              {analysisResult.duplicate_detections && analysisResult.duplicate_detections.length > 0 && (
-                <div className="duplicate-consolidated-note">
-                  ℹ️ <strong>Duplicate Consolidations: </strong>
-                  Repeated additive mentions ({analysisResult.duplicate_detections.map(d => `${d.code} x${d.count}`).join(", ")}) were consolidated without duplicate penalty deductions.
-                </div>
-              )}
-
-              {(!analysisResult.parsed_additives || analysisResult.parsed_additives.length === 0) ? (
-                <div className="empty-notice">
-                  <span>🌿</span>
-                  <p>No food additives detected in this formulation.</p>
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="additives-table">
-                    <thead>
-                      <tr>
-                        <th>Code</th>
-                        <th>Additive Name</th>
-                        <th>Functional Classes</th>
-                        <th>Color Type</th>
-                        <th>Hazard Level</th>
-                        <th>FSSAI Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analysisResult.parsed_additives.map((item, idx) => (
-                        <tr key={idx}>
-                          <td><strong>{item.code}</strong></td>
-                          <td>
-                            {item.name}
-                            {item.alternative_names && item.alternative_names.length > 0 && (
-                              <p className="additive-desc" style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                                Also: {item.alternative_names.slice(0, 3).join(", ")}
-                              </p>
-                            )}
-                            {item.description && (
-                              <p className="additive-desc">{item.description}</p>
-                            )}
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                              {(item.functional_categories || [item.class]).map((fc, i) => (
-                                <span key={i} className="badge badge-class">{fc}</span>
-                              ))}
-                            </div>
-                          </td>
-                          <td>
-                            {item.is_color ? (
-                              <span style={{
-                                fontSize: "0.72rem",
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                backgroundColor: item.color_origin === "synthetic" ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)",
-                                color: item.color_origin === "synthetic" ? "#fca5a5" : "#a7f3d0",
-                                border: `1px solid ${item.color_origin === "synthetic" ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)"}`
-                              }}>
-                                🎨 {item.color_origin}
-                              </span>
-                            ) : (
-                              <span style={{ color: "#64748b", fontSize: "0.75rem" }}>—</span>
-                            )}
-                          </td>
-                          <td>
-                            <span className={`badge badge-hazard hazard-${item.hazard_level?.toLowerCase()}`}>
-                              {item.hazard_level}
-                            </span>
-                          </td>
-                          <td>
-                            {item.regulatory ? (
-                              <span
-                                className={`badge ${item.regulatory.verified ? "badge-valid" : "badge-pending"}`}
-                                title={item.regulatory.regulatory_notes || ""}
-                              >
-                                {item.regulatory.fssai_status?.substring(0, 30) || "Unknown"}
-                                {item.regulatory.fssai_status?.length > 30 ? "…" : ""}
-                              </span>
-                            ) : (
-                              <span className="badge badge-pending">Not checked</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Unmapped tokens notice */}
-              {analysisResult.unmapped_tokens && analysisResult.unmapped_tokens.length > 0 && (
-                <div className="unmapped-notice">
-                  <span>⚠️</span>
-                  <span>
-                    <strong>Unrecognised tokens (flagged for review): </strong>
-                    {analysisResult.unmapped_tokens.join(", ")}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+            {/* STEP 4: PERSONALISED ANALYSIS RESULTS */}
+            {currentStep === 4 && (
+              <AnalysisResultsView
+                analysisResult={analysisResult}
+                dietaryProfile={dietaryProfile}
+                onScanAnother={() => {
+                  setAnalysisResult(null);
+                  setCurrentStep(3);
+                }}
+                onOpenPreferences={() => {
+                  setCurrentStep(2);
+                }}
+              />
+            )}
+          </>
         )}
       </main>
 
-      {/* Modals */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onAuthSuccess={(user, profile) => {
-          setCurrentUser(user);
-          setDietaryProfile(profile);
-          if (analysisResult?.product?.ean && analysisResult.product.ean !== "N/A") {
-            handleRunAnalysis({ ean: analysisResult.product.ean, dietary_profile: profile });
-          }
-        }}
-      />
-
-      <DietaryProfileModal
-        isOpen={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-        currentProfile={dietaryProfile}
-        onProfileSaved={(prof) => {
-          setDietaryProfile(prof);
-          if (analysisResult?.product?.ean && analysisResult.product.ean !== "N/A") {
-            handleRunAnalysis({ ean: analysisResult.product.ean, dietary_profile: prof });
-          }
-        }}
-      />
-
-      <AnalysisHistoryModal
-        isOpen={showHistoryModal}
-        onClose={() => setShowHistoryModal(false)}
-      />
-
-      {/* Human-in-the-Loop Audit Modal */}
+      {/* Human-in-the-Loop Audit Queue Modal */}
       <AuditQueueModal
         isOpen={showAuditModal}
         onClose={() => setShowAuditModal(false)}
       />
 
+      {/* Footer */}
       <footer className="main-footer">
-        <p>&copy; {new Date().getFullYear()} Food Label Verification System • Multimodal Deep Learning & Dietary Verification</p>
+        <p>
+          &copy; {new Date().getFullYear()} Food Label Verification System • Multimodal Deep Learning & Dietary Verification
+        </p>
       </footer>
     </div>
   );

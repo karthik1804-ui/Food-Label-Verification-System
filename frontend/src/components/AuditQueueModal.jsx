@@ -1,16 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { fetchAuditQueue, submitAuditReview, fetchAuditStats, deleteAuditRecord } from "../api";
+import Icon from "./Icons";
 
-/**
- * AuditQueueModal — v2.5 (Phase 10: HITL Review & Audit Records Management)
- *
- * Full Human-in-the-Loop review and queue management interface:
- *   - Aggregated Queue Statistics (Pending, Confirmed, Corrected, Rejected)
- *   - Status Filter Tabs & In-Memory Quick Search
- *   - Review Actions: Confirm (not an additive), Reject (false positive), Correct (provide INS numbers)
- *   - Record Dismissal/Deletion for obsolete queue records
- */
-function AuditQueueModal({ isOpen, onClose }) {
+export default function AuditQueueModal({ isOpen, onClose }) {
   const [records, setRecords] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -33,7 +25,7 @@ function AuditQueueModal({ isOpen, onClose }) {
       if (statsData) setStats(statsData);
     } catch (err) {
       console.error("Failed to load audit queue:", err);
-      setFeedback("Failed to load records. Is the backend running?");
+      setFeedback("Failed to load audit queue. Please ensure the backend is running.");
     } finally {
       setLoading(false);
     }
@@ -48,130 +40,137 @@ function AuditQueueModal({ isOpen, onClose }) {
 
   const handleReview = async (recordId, action) => {
     const corrected = action === "correct"
-      ? correctionInput.split(",").map(s => s.trim()).filter(Boolean)
+      ? correctionInput.split(",").map((s) => s.trim()).filter(Boolean)
       : undefined;
 
     if (action === "correct" && (!corrected || corrected.length === 0)) {
-      setFeedback("Please enter the correct INS code(s) before submitting a correction.");
+      setFeedback("Please enter at least one INS code for the correction.");
       return;
     }
 
     try {
       const result = await submitAuditReview(recordId, action, corrected, reviewNote);
-      setFeedback(result.message || "Review submitted.");
+      setFeedback(result.message || "Review decision recorded.");
       setReviewingId(null);
       setCorrectionInput("");
       setReviewNote("");
       await loadData();
     } catch (err) {
-      setFeedback(`Failed to submit review: ${err.response?.data?.message || err.message}`);
+      setFeedback(`Review submission failed: ${err.response?.data?.message || err.message}`);
     }
   };
 
   const handleDeleteRecord = async (recordId) => {
-    if (!window.confirm("Are you sure you want to dismiss this audit record?")) return;
+    if (!window.confirm("Dismiss and remove this audit record from the queue?")) return;
     try {
       await deleteAuditRecord(recordId);
-      setFeedback("Audit record deleted.");
+      setFeedback("Audit record dismissed.");
       await loadData();
     } catch (err) {
       setFeedback(`Failed to delete record: ${err.response?.data?.message || err.message}`);
     }
   };
 
-  const statusBadgeClass = (status) => {
-    if (!status) return "badge-pending";
-    if (status.includes("CONFIRMED")) return "badge-valid";
-    if (status.includes("REJECTED")) return "badge-invalid";
-    if (status.includes("CORRECTED")) return "badge-class";
-    return "badge-pending";
+  const statusBadgeInfo = (status) => {
+    if (!status) return { label: "Pending", cls: "status-pill-warning" };
+    if (status.includes("CONFIRMED")) return { label: "Confirmed", cls: "status-pill-success" };
+    if (status.includes("REJECTED")) return { label: "Rejected", cls: "status-pill-danger" };
+    if (status.includes("CORRECTED")) return { label: "Corrected", cls: "status-pill-info" };
+    return { label: "Pending", cls: "status-pill-warning" };
   };
 
   const filteredRecords = records.filter((r) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const matchContext = (r.context_identifier || "").toLowerCase().includes(q);
-    const matchTokens = (r.unmapped_tokens || []).some(t => t.toLowerCase().includes(q));
-    const matchNote = (r.review_history || []).some(h => (h.reviewer_note || "").toLowerCase().includes(q));
+    const matchTokens = (r.unmapped_tokens || []).some((t) => t.toLowerCase().includes(q));
+    const matchNote = (r.review_history || []).some((h) => (h.reviewer_note || "").toLowerCase().includes(q));
     return matchContext || matchTokens || matchNote;
   });
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content glass" style={{ maxWidth: "1000px", width: "95%" }}>
+    <div className="clinical-modal-overlay" onClick={onClose}>
+      <div
+        className="clinical-modal-box audit-modal-box"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-labelledby="audit-modal-title"
+      >
         {/* Header */}
-        <div className="modal-header">
-          <div>
-            <h2>📋 Human-in-the-Loop Audit & Taxonomy Queue</h2>
-            <p className="card-sub">
-              Review unmapped additive tokens, track reviewer actions, and manage taxonomy verification.
-            </p>
+        <div className="clinical-modal-header">
+          <div className="modal-title-left">
+            <div className="modal-icon-box">
+              <Icon name="clipboardList" size={20} color="#00454A" />
+            </div>
+            <div>
+              <h2 id="audit-modal-title" className="modal-heading">
+                Human-in-the-Loop Audit & Taxonomy Queue
+              </h2>
+              <p className="modal-subtext">
+                Expert verification queue for unmapped additive formulation tokens and taxonomy reconciliation.
+              </p>
+            </div>
           </div>
-          <button className="btn-close" onClick={onClose}>&times;</button>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label="Close modal"
+          >
+            <Icon name="x" size={20} />
+          </button>
         </div>
 
-        {/* Feedback Banner */}
+        {/* Feedback message */}
         {feedback && (
-          <div className="audit-feedback-banner" style={{ margin: "0.5rem 0" }}>
-            {feedback}
+          <div className="alert-banner alert-success" style={{ margin: "1rem 1.5rem 0 1.5rem" }}>
+            <Icon name="checkCircle" size={16} />
+            <span>{feedback}</span>
           </div>
         )}
 
-        {/* Audit Queue Summary Statistics Pills */}
+        {/* Aggregate Statistics Row */}
         {stats && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-            gap: "0.5rem",
-            marginBottom: "1rem"
-          }}>
-            <div style={statCardStyle}>
-              <span style={statNumberStyle}>{stats.total_records}</span>
-              <span style={statLabelStyle}>Total Flagged</span>
+          <div className="audit-stats-row">
+            <div className="audit-stat-pill">
+              <span className="stat-number">{stats.total_records}</span>
+              <span className="stat-name">Total Flagged</span>
             </div>
-            <div style={{ ...statCardStyle, borderColor: "rgba(245, 158, 11, 0.4)" }}>
-              <span style={{ ...statNumberStyle, color: "#fde68a" }}>{stats.pending_count}</span>
-              <span style={statLabelStyle}>Pending Review</span>
+            <div className="audit-stat-pill warning">
+              <span className="stat-number">{stats.pending_count}</span>
+              <span className="stat-name">Pending Review</span>
             </div>
-            <div style={{ ...statCardStyle, borderColor: "rgba(16, 185, 129, 0.4)" }}>
-              <span style={{ ...statNumberStyle, color: "#a7f3d0" }}>{stats.confirmed_count}</span>
-              <span style={statLabelStyle}>Confirmed Non-Additives</span>
+            <div className="audit-stat-pill success">
+              <span className="stat-number">{stats.confirmed_count}</span>
+              <span className="stat-name">Confirmed Non-Additives</span>
             </div>
-            <div style={{ ...statCardStyle, borderColor: "rgba(99, 102, 241, 0.4)" }}>
-              <span style={{ ...statNumberStyle, color: "#c7d2fe" }}>{stats.corrected_count}</span>
-              <span style={statLabelStyle}>Corrected Mappings</span>
+            <div className="audit-stat-pill info">
+              <span className="stat-number">{stats.corrected_count}</span>
+              <span className="stat-name">Corrected Mappings</span>
             </div>
-            <div style={{ ...statCardStyle, borderColor: "rgba(239, 68, 68, 0.4)" }}>
-              <span style={{ ...statNumberStyle, color: "#fca5a5" }}>{stats.rejected_count}</span>
-              <span style={statLabelStyle}>False Positives</span>
+            <div className="audit-stat-pill danger">
+              <span className="stat-number">{stats.rejected_count}</span>
+              <span className="stat-name">False Positives</span>
             </div>
           </div>
         )}
 
-        {/* Status Filter Tabs & Search Bar */}
-        <div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "0.75rem",
-          marginBottom: "1rem"
-        }}>
-          {/* Status Tabs */}
-          <div className="tab-control-container" style={{ margin: 0, padding: "0.2rem" }}>
+        {/* Filters and Search Bar */}
+        <div className="audit-filter-bar">
+          <div className="audit-tabs-segmented">
             {[
               { id: "all", label: "All Records" },
               { id: "PENDING_EXPERT_REVIEW", label: "Pending" },
               { id: "CONFIRMED_BY_REVIEWER", label: "Confirmed" },
               { id: "CORRECTED_BY_REVIEWER", label: "Corrected" },
               { id: "REJECTED_BY_REVIEWER", label: "Rejected" }
-            ].map(tab => (
+            ].map((tab) => (
               <button
                 key={tab.id}
-                className={`tab-btn ${statusFilter === tab.id ? "active" : ""}`}
-                style={{ padding: "0.35rem 0.75rem", fontSize: "0.78rem" }}
+                type="button"
+                className={`audit-tab-btn ${statusFilter === tab.id ? "active" : ""}`}
                 onClick={() => setStatusFilter(tab.id)}
               >
                 {tab.label}
@@ -179,181 +178,181 @@ function AuditQueueModal({ isOpen, onClose }) {
             ))}
           </div>
 
-          {/* Quick Search */}
-          <input
-            type="text"
-            placeholder="Filter by token or product..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="barcode-input"
-            style={{ width: "220px", padding: "0.35rem 0.65rem", fontSize: "0.8rem" }}
-          />
+          <div className="input-with-icon audit-search-box">
+            <Icon name="search" size={16} className="input-leading-icon" />
+            <input
+              type="text"
+              className="form-input form-input-sm"
+              placeholder="Search token or product..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="modal-body" style={{ maxHeight: "55vh", overflowY: "auto" }}>
+        {/* Table Body */}
+        <div className="audit-table-wrap">
           {loading ? (
-            <div className="loading-state">
-              <div className="spinner" />
+            <div className="empty-subtle-box">
+              <div className="btn-spinner" />
               <p>Loading audit queue...</p>
             </div>
           ) : filteredRecords.length === 0 ? (
-            <div className="empty-notice">
-              <span>✅</span>
-              <p>No audit records found matching your current filter.</p>
+            <div className="empty-subtle-box">
+              <Icon name="checkCircle" size={32} color="#16A34A" />
+              <h4 style={{ margin: "0.5rem 0" }}>No Records In Queue</h4>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+                No unmapped additive tokens match your selected filter criteria.
+              </p>
             </div>
           ) : (
-            <div className="audit-table-container">
-              <table className="audit-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Product / Context</th>
-                    <th>Unrecognised Tokens</th>
-                    <th>Match Ratio</th>
-                    <th>OCR Conf.</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRecords.map((r) => (
+            <table className="clinical-table audit-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Product Context</th>
+                  <th>Unmapped Tokens</th>
+                  <th>Taxonomy Match</th>
+                  <th>OCR Conf.</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRecords.map((r) => {
+                  const statusObj = statusBadgeInfo(r.audit_status);
+                  const isReviewing = reviewingId === r.id;
+
+                  return (
                     <React.Fragment key={r.id || r.timestamp}>
-                      <tr>
-                        <td style={{ fontSize: "0.75rem", whiteSpace: "nowrap" }}>
-                          {r.timestamp ? new Date(r.timestamp).toLocaleString() : "N/A"}
+                      <tr className={isReviewing ? "row-expanded" : ""}>
+                        <td className="text-muted text-xs">
+                          {r.timestamp ? new Date(r.timestamp).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          }) : "N/A"}
                         </td>
-                        <td><strong>{r.context_identifier || "Direct Scan"}</strong></td>
                         <td>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
-                            {(r.unmapped_tokens || []).map((t, idx) => (
-                              <span key={idx} className="badge badge-unmapped">{t}</span>
+                          <strong>{r.context_identifier || "Direct Scan"}</strong>
+                        </td>
+                        <td>
+                          <div className="unmapped-tokens-wrap">
+                            {(r.unmapped_tokens || []).map((t, i) => (
+                              <span key={i} className="token-chip">{t}</span>
                             ))}
                           </div>
                           {r.corrected_tokens && r.corrected_tokens.length > 0 && (
-                            <div style={{ fontSize: "0.72rem", color: "#93c5fd", marginTop: "0.2rem" }}>
+                            <span className="corrected-tokens-hint">
                               Mapped to: <strong>{r.corrected_tokens.join(", ")}</strong>
-                            </div>
+                            </span>
                           )}
                         </td>
                         <td>
                           {r.additive_match_confidence !== undefined
                             ? `${Math.round(r.additive_match_confidence * 100)}%`
-                            : "N/A"}
+                            : "100%"}
                         </td>
                         <td>
                           {r.ocr_confidence !== undefined
                             ? `${Math.round(r.ocr_confidence * 100)}%`
-                            : "N/A"}
+                            : "100%"}
                         </td>
                         <td>
-                          <span className={`badge ${statusBadgeClass(r.audit_status)}`}>
-                            {r.audit_status?.replace(/_/g, " ") || "Pending"}
+                          <span className={`status-pill ${statusObj.cls}`}>
+                            {statusObj.label}
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: "flex", gap: "0.3rem" }}>
-                            {r.audit_status === "PENDING_EXPERT_REVIEW" ? (
-                              <button
-                                className="btn btn-xs btn-valid"
-                                onClick={() => setReviewingId(
-                                  reviewingId === r.id ? null : r.id
-                                )}
-                              >
-                                {reviewingId === r.id ? "Cancel" : "Review"}
-                              </button>
-                            ) : (
-                              <button
-                                className="btn btn-xs btn-outline"
-                                onClick={() => setReviewingId(
-                                  reviewingId === r.id ? null : r.id
-                                )}
-                              >
-                                {reviewingId === r.id ? "Close" : "History"}
-                              </button>
-                            )}
+                          <div className="audit-actions-group">
                             <button
-                              className="btn btn-xs btn-outline"
-                              style={{ color: "#f87171", borderColor: "#f8717140" }}
-                              onClick={() => handleDeleteRecord(r.id)}
-                              title="Dismiss/delete this audit record"
+                              type="button"
+                              className="btn btn-outline btn-xs"
+                              onClick={() => setReviewingId(isReviewing ? null : r.id)}
                             >
-                              🗑️
+                              {r.audit_status === "PENDING_EXPERT_REVIEW" ? (isReviewing ? "Cancel" : "Review") : (isReviewing ? "Close" : "History")}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs text-danger"
+                              onClick={() => handleDeleteRecord(r.id)}
+                              title="Dismiss record"
+                            >
+                              <Icon name="trash2" size={13} />
                             </button>
                           </div>
                         </td>
                       </tr>
 
-                      {/* Review or History drawer */}
-                      {reviewingId === r.id && (
-                        <tr className="review-form-row">
+                      {/* Expandable Review / History Drawer */}
+                      {isReviewing && (
+                        <tr className="expanded-detail-row">
                           <td colSpan={7}>
-                            <div className="review-inline-form">
-                              <p className="review-form-title">
-                                Record #{r.id} • Tokens: <strong>{(r.unmapped_tokens || []).join(", ")}</strong>
-                              </p>
+                            <div className="audit-review-drawer">
+                              <h4 className="drawer-title">
+                                Reviewing Record #{r.id} • Tokens: <strong>{(r.unmapped_tokens || []).join(", ")}</strong>
+                              </h4>
 
-                              {/* Show prior review history if available */}
                               {r.review_history && r.review_history.length > 0 && (
-                                <div style={{
-                                  marginBottom: "0.75rem",
-                                  padding: "0.5rem",
-                                  backgroundColor: "rgba(0,0,0,0.3)",
-                                  borderRadius: "4px",
-                                  fontSize: "0.78rem"
-                                }}>
-                                  <span style={{ color: "#94a3b8" }}>PREVIOUS REVIEW DECISIONS:</span>
+                                <div className="prior-history-box">
+                                  <span className="prior-history-label">Previous Decisions:</span>
                                   {r.review_history.map((h, i) => (
-                                    <div key={i} style={{ color: "#cbd5e1", marginTop: "0.2rem" }}>
-                                      • [{new Date(h.timestamp).toLocaleString()}] Action: <strong>{h.action.toUpperCase()}</strong>
+                                    <div key={i} className="history-step">
+                                      • [{new Date(h.timestamp).toLocaleTimeString()}] Action: <strong>{h.action.toUpperCase()}</strong>
                                       {h.reviewer_note && ` — Note: "${h.reviewer_note}"`}
                                     </div>
                                   ))}
                                 </div>
                               )}
 
-                              {/* Review Action Form (allowed for both pending and updates) */}
-                              <div className="review-form-fields">
-                                <div className="form-field">
-                                  <label>Correction (INS codes, comma-separated)</label>
+                              <div className="review-inputs-row">
+                                <div className="form-group flex-1">
+                                  <label className="form-label">Correction (INS codes, comma-separated):</label>
                                   <input
                                     type="text"
+                                    className="form-input form-input-sm"
                                     placeholder="e.g. INS 250, INS 211"
                                     value={correctionInput}
                                     onChange={(e) => setCorrectionInput(e.target.value)}
-                                    className="review-text-input"
                                   />
                                 </div>
-                                <div className="form-field">
-                                  <label>Reviewer Note (optional)</label>
+                                <div className="form-group flex-1">
+                                  <label className="form-label">Reviewer Note (optional):</label>
                                   <input
                                     type="text"
-                                    placeholder="Explain your decision..."
+                                    className="form-input form-input-sm"
+                                    placeholder="Provide clinical rationale..."
                                     value={reviewNote}
                                     onChange={(e) => setReviewNote(e.target.value)}
-                                    className="review-text-input"
                                   />
                                 </div>
                               </div>
 
-                              <div className="review-action-btns review-action-btns-row">
+                              <div className="review-btn-row">
                                 <button
-                                  className="btn btn-sm btn-valid"
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
                                   onClick={() => handleReview(r.id, "confirm")}
                                 >
-                                  ✓ Confirm (not an additive)
+                                  <Icon name="check" size={14} color="#16A34A" />
+                                  <span>Confirm (Not an Additive)</span>
                                 </button>
                                 <button
-                                  className="btn btn-sm btn-invalid"
+                                  type="button"
+                                  className="btn btn-outline btn-sm text-danger"
                                   onClick={() => handleReview(r.id, "reject")}
                                 >
-                                  ✗ Reject (false positive)
+                                  <Icon name="x" size={14} />
+                                  <span>Reject (False Positive)</span>
                                 </button>
                                 <button
-                                  className="btn btn-sm btn-primary"
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
                                   onClick={() => handleReview(r.id, "correct")}
                                 >
-                                  ✏ Correct
+                                  <Icon name="checkCircle" size={14} />
+                                  <span>Submit INS Correction</span>
                                 </button>
                               </div>
                             </div>
@@ -361,52 +360,37 @@ function AuditQueueModal({ isOpen, onClose }) {
                         </tr>
                       )}
                     </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="modal-footer" style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
-            Showing {filteredRecords.length} of {records.length} records
+        {/* Modal Footer */}
+        <div className="clinical-modal-footer">
+          <span className="footer-count-text">
+            Showing {filteredRecords.length} of {records.length} records in queue
           </span>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button className="btn btn-secondary" onClick={loadData}>🔄 Refresh</button>
-            <button className="btn btn-secondary" onClick={onClose}>Close</button>
+          <div className="flex-row gap-sm">
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={loadData}
+            >
+              <Icon name="refreshCw" size={14} />
+              <span>Refresh</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onClose}
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-const statCardStyle = {
-  padding: "0.6rem 0.85rem",
-  backgroundColor: "rgba(15, 23, 42, 0.55)",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  borderRadius: "8px",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center"
-};
-
-const statNumberStyle = {
-  fontSize: "1.3rem",
-  fontWeight: 800,
-  color: "#f8fafc",
-  lineHeight: 1.1
-};
-
-const statLabelStyle = {
-  fontSize: "0.68rem",
-  color: "#94a3b8",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-  marginTop: "0.2rem",
-  textAlign: "center"
-};
-
-export default AuditQueueModal;

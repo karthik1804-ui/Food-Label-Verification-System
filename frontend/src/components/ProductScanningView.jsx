@@ -27,24 +27,6 @@ const SAMPLE_BENCHMARK_PRODUCTS = [
   { ean: "8901725132224", name: "Instant Masala Noodles", note: "Multiple INS Additives" }
 ];
 
-const PRESET_FORMULATIONS = [
-  {
-    name: "Instant Noodles",
-    tag: "MSG + Thickeners + Caramel IV",
-    text: "Ingredients: Refined Wheat Flour (Maida), Palm Oil, Salt, Wheat Gluten, Mineral (Calcium Carbonate), Thickeners (INS 508, INS 412), Acidity Regulators (INS 501(i), INS 500(i), INS 451(i)). Noodle Tastemaker: Hydrolysed Peanut Protein, Mixed Spices (15.5%) (Onion Powder, Coriander Powder, Chilli Powder, Turmeric Powder, Garlic Powder), Flavour Enhancer (INS 635, INS 621), Thickener (INS 508), Salt, Acidity Regulator (INS 330), Caramel Colour (INS 150d). CONTAINS WHEAT, PEANUT AND GLUTEN."
-  },
-  {
-    name: "Sparkling Orange Drink",
-    tag: "Synthetic Colours + Preservatives",
-    text: "Ingredients: Carbonated Water, Sugar, Acidity Regulators (INS 330, INS 331), Preservative (INS 211), Synthetic Food Colour (INS 102, INS 110), Added Nature Identical Flavouring Substances (Orange). Contains Permitted Synthetic Food Colours."
-  },
-  {
-    name: "Clean Fruit & Nut Bar",
-    tag: "All-Natural • Zero Additives",
-    text: "Ingredients: Rolled Oats, Raw Honey, Almonds, Pumpkin Seeds, Sunflower Seeds, Virgin Coconut Oil, Cinnamon Powder, Sea Salt. CONTAINS TREE NUTS (ALMONDS)."
-  }
-];
-
 export default function ProductScanningView({
   onAnalyzeOcr,
   onAnalyzeBarcode,
@@ -52,7 +34,7 @@ export default function ProductScanningView({
   loading,
   dietaryProfile
 }) {
-  const [activeScanMode, setActiveScanMode] = useState("camera"); // 'camera' | 'upload' | 'text'
+  const [activeScanMode, setActiveScanMode] = useState("camera"); // 'camera' | 'upload' | 'barcode' | 'text'
 
   // Camera state
   const webcamRef = useRef(null);
@@ -65,15 +47,17 @@ export default function ProductScanningView({
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [uploadError, setUploadError] = useState("");
 
-  // Text state
-  const [manualText, setManualText] = useState("");
-  const [ocrConfig, setOcrConfig] = useState("B"); // 'B' (Improved OpenCV) | 'A' (Standard Raw)
-  const [showComparisonModal, setShowComparisonModal] = useState(false);
-
-  // Optional Barcode state
+  // Barcode state (Optional)
   const [barcodeInput, setBarcodeInput] = useState("");
   const [barcodeFeedback, setBarcodeFeedback] = useState("");
-  const [showBarcodeSection, setShowBarcodeSection] = useState(false);
+
+  // Manual formulation text state
+  const [manualText, setManualText] = useState("");
+
+  // Developer / Diagnostics Section (Kept separate from primary clinical UX)
+  const [showDevDiagnostics, setShowDevDiagnostics] = useState(false);
+  const [ocrConfig, setOcrConfig] = useState("B"); // 'B' (OpenCV Preprocessing) | 'A' (Standard Raw)
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   // ---------- Camera Handlers ----------
   const handleCapture = () => {
@@ -84,7 +68,7 @@ export default function ProductScanningView({
         setCapturedImage(screenshot);
         setCameraError("");
       } else {
-        setCameraError("Camera capture returned empty frame. Please allow camera permissions.");
+        setCameraError("Camera capture returned empty frame. Please ensure camera permissions are granted.");
       }
     } catch (err) {
       setCameraError("Camera error: " + (err.message || err));
@@ -102,12 +86,12 @@ export default function ProductScanningView({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setUploadError("Please select a valid image file (JPEG, PNG, WebP).");
+      setUploadError("Please upload a valid packaging image (PNG, JPEG, WEBP).");
       return;
     }
 
     if (file.size > 15 * 1024 * 1024) {
-      setUploadError("File size exceeds 15 MB limit. Please use a smaller photo.");
+      setUploadError("Image exceeds 15MB limit. Please choose a smaller image.");
       return;
     }
 
@@ -117,25 +101,19 @@ export default function ProductScanningView({
       setUploadedImage(e.target.result);
     };
     reader.onerror = () => {
-      setUploadError("Failed to read selected image file.");
+      setUploadError("Failed to read image file. Please try again.");
     };
     reader.readAsDataURL(file);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    e.stopPropagation();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileProcess(e.dataTransfer.files[0]);
     }
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleRemoveUploadedImage = () => {
+  const handleRemoveUploaded = () => {
     setUploadedImage(null);
     setUploadedFileName("");
     setUploadError("");
@@ -144,84 +122,77 @@ export default function ProductScanningView({
 
   // ---------- Barcode Handlers ----------
   const handleBarcodeChange = (val) => {
-    const clean = val.replace(/\D/g, "");
-    setBarcodeInput(clean);
-    if (clean.length === 13) {
-      const valid = validateEan13(clean);
-      setBarcodeFeedback(valid ? "✓ Valid EAN-13 Checksum" : "⚠️ Invalid Modulo-10 Checksum Digit");
-    } else if (clean.length > 0) {
-      setBarcodeFeedback(`EAN-13 length: ${clean.length} / 13 digits`);
-    } else {
+    setBarcodeInput(val);
+    const clean = val.trim();
+    if (!clean) {
       setBarcodeFeedback("");
+    } else if (clean.length === 13) {
+      if (validateEan13(clean)) {
+        setBarcodeFeedback("✓ Valid EAN-13 barcode format");
+      } else {
+        setBarcodeFeedback("⚠️ Invalid EAN-13 checksum");
+      }
+    } else {
+      setBarcodeFeedback(`${clean.length}/13 digits`);
     }
   };
 
-  const handleBarcodeSubmit = (e) => {
-    if (e) e.preventDefault();
-    if (!barcodeInput.trim()) return;
-    onAnalyzeBarcode(barcodeInput.trim());
-  };
+  // ---------- Primary Submission Handlers ----------
+  const handleAnalyzeActiveScan = () => {
+    if (loading) return;
 
-  const handleSelectBenchmark = (sampleEan) => {
-    setBarcodeInput(sampleEan);
-    setBarcodeFeedback("✓ Valid Benchmark EAN-13");
-    onAnalyzeBarcode(sampleEan);
-  };
-
-  // ---------- Primary Analyze Action ----------
-  const handleTriggerAnalysis = () => {
     if (activeScanMode === "camera") {
-      if (capturedImage) {
-        onAnalyzeOcr(capturedImage, false, ocrConfig);
-      } else {
-        // Snap immediately and analyze
-        if (webcamRef.current) {
-          const shot = webcamRef.current.getScreenshot();
-          if (shot) {
-            onAnalyzeOcr(shot, false, ocrConfig);
-          } else {
-            setCameraError("Please capture an image of the ingredient label first.");
-          }
-        }
+      if (!capturedImage) {
+        setCameraError("Please capture an ingredient label image first.");
+        return;
       }
+      onAnalyzeOcr(capturedImage, false, ocrConfig);
     } else if (activeScanMode === "upload") {
       if (!uploadedImage) {
-        setUploadError("Please select or drop an image of the food label first.");
+        setUploadError("Please upload an ingredient label image first.");
         return;
       }
       onAnalyzeOcr(uploadedImage, true, ocrConfig);
+    } else if (activeScanMode === "barcode") {
+      const clean = barcodeInput.trim();
+      if (!clean) {
+        setBarcodeFeedback("Please enter an EAN-13 barcode number.");
+        return;
+      }
+      onAnalyzeBarcode(clean);
     } else if (activeScanMode === "text") {
       if (!manualText.trim()) return;
-      onAnalyzeManualText(manualText.trim());
+      onAnalyzeManualText(manualText);
     }
   };
 
+  const activeImage =
+    activeScanMode === "camera"
+      ? capturedImage
+      : activeScanMode === "upload"
+      ? uploadedImage
+      : null;
+
   return (
-    <div className="product-scanning-container">
-      {/* Step Header */}
-      <div className="section-intro-header">
-        <div className="section-badge">
-          <Icon name="camera" size={16} />
-          <span>Step 3 of 4</span>
-        </div>
-        <h2>Scan Food Packaging or Ingredients</h2>
-        <p>
-          Capture or upload the physical ingredients declaration on the packaging for OCR analysis. Barcode scanning is completely optional.
+    <div className="clinical-page-container">
+      {/* Page Header */}
+      <div className="clinical-page-header">
+        <span className="clinical-kicker">Step 4 • Product Scanning</span>
+        <h1 className="clinical-title">Scan Your Food Product</h1>
+        <p className="clinical-description">
+          Capture or upload the ingredient declaration to analyse its contents against your personalised dietary preferences.
         </p>
       </div>
 
-      {/* Main Scan Mode Tabs */}
-      <div className="scan-mode-tabs-container">
+      {/* Mode Selection Tabs */}
+      <div className="clinical-scan-modes-tabs">
         <button
           type="button"
           className={`scan-mode-tab ${activeScanMode === "camera" ? "active" : ""}`}
           onClick={() => setActiveScanMode("camera")}
         >
-          <Icon name="camera" size={20} />
-          <div className="tab-label-group">
-            <span className="tab-title">Take a Photo</span>
-            <span className="tab-sub">Live camera capture</span>
-          </div>
+          <Icon name="camera" size={18} />
+          <span>Take Photo</span>
         </button>
 
         <button
@@ -229,11 +200,17 @@ export default function ProductScanningView({
           className={`scan-mode-tab ${activeScanMode === "upload" ? "active" : ""}`}
           onClick={() => setActiveScanMode("upload")}
         >
-          <Icon name="upload" size={20} />
-          <div className="tab-label-group">
-            <span className="tab-title">Upload Packaging Image</span>
-            <span className="tab-sub">Browse from device</span>
-          </div>
+          <Icon name="upload" size={18} />
+          <span>Upload Image</span>
+        </button>
+
+        <button
+          type="button"
+          className={`scan-mode-tab ${activeScanMode === "barcode" ? "active" : ""}`}
+          onClick={() => setActiveScanMode("barcode")}
+        >
+          <Icon name="barcode" size={18} />
+          <span>Scan Barcode (Optional)</span>
         </button>
 
         <button
@@ -241,439 +218,391 @@ export default function ProductScanningView({
           className={`scan-mode-tab ${activeScanMode === "text" ? "active" : ""}`}
           onClick={() => setActiveScanMode("text")}
         >
-          <Icon name="fileText" size={20} />
-          <div className="tab-label-group">
-            <span className="tab-title">Ingredient Text</span>
-            <span className="tab-sub">Paste or test formulation</span>
-          </div>
+          <Icon name="fileText" size={18} />
+          <span>Manual Text</span>
         </button>
       </div>
 
-      {/* OCR Pipeline Configuration Selector (Config A vs Config B) */}
-      <div className="ocr-config-selector-bar">
-        <span className="config-selector-label">OCR Pipeline:</span>
-        <button
-          type="button"
-          className={`config-pill-btn ${ocrConfig === "B" ? "active" : ""}`}
-          onClick={() => setOcrConfig("B")}
-          title="Configuration B: OpenCV CLAHE + Unsharp Masking + Tesseract (Recommended)"
-        >
-          <Icon name="sparkles" size={14} color={ocrConfig === "B" ? "#059669" : "#64748b"} />
-          <span>Config B: Improved (OpenCV + Tesseract)</span>
-        </button>
-        <button
-          type="button"
-          className={`config-pill-btn ${ocrConfig === "A" ? "active" : ""}`}
-          onClick={() => setOcrConfig("A")}
-          title="Configuration A: Original Image -> Tesseract directly"
-        >
-          <span>Config A: Standard (Raw Tesseract)</span>
-        </button>
-        <button
-          type="button"
-          className="config-pill-btn comp-btn"
-          onClick={() => setShowComparisonModal(true)}
-          title="Inspect Comparative Evaluation & Benchmark Metrics (CER / WER / F1)"
-        >
-          <Icon name="sliders" size={14} color="#2563eb" />
-          <span>Benchmark & Compare</span>
-        </button>
-      </div>
-
-      {/* Primary Scanning Panel */}
-      <div className="card glass scanning-main-panel">
-        {/* MODE A: LIVE CAMERA */}
-        {activeScanMode === "camera" && (
-          <div className="camera-scan-layout">
-            {cameraError && (
-              <div className="alert-banner alert-warning" style={{ marginBottom: "1rem" }}>
-                <Icon name="alertTriangle" size={18} />
-                <span>{cameraError}</span>
-              </div>
-            )}
-
+      {/* ACTIVE MODE 1: CAMERA SCANNER */}
+      {activeScanMode === "camera" && (
+        <div className="card clinical-scan-card">
+          <div className="camera-viewfinder-wrap">
             {!capturedImage ? (
-              <div className="webcam-viewport">
+              <>
                 <Webcam
                   ref={webcamRef}
                   audio={false}
                   screenshotFormat="image/jpeg"
-                  screenshotQuality={0.95}
+                  className="camera-video-feed"
                   videoConstraints={{
                     facingMode: "environment",
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
                   }}
-                  className="webcam-feed-element"
-                  onUserMediaError={(err) => setCameraError("Camera access denied or device not found: " + (err.message || err))}
-                />
-
-                {/* Consumer-friendly viewfinder overlay */}
-                <div className="camera-viewfinder-overlay">
-                  <div className="viewfinder-frame">
-                    <span className="corner corner-tl" />
-                    <span className="corner corner-tr" />
-                    <span className="corner corner-bl" />
-                    <span className="corner corner-br" />
-                    <div className="viewfinder-hint">Align Ingredient List Inside Box</div>
-                  </div>
-                </div>
-
-                <div className="camera-controls-bar">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-large camera-capture-btn"
-                    onClick={handleCapture}
-                    disabled={loading}
-                  >
-                    <Icon name="camera" size={20} />
-                    <span>Take Photo</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="captured-preview-container">
-                <div className="preview-image-wrapper">
-                  <img src={capturedImage} alt="Captured food label" className="captured-preview-img" />
-                  <div className="preview-badge-status">
-                    <Icon name="checkCircle" size={16} />
-                    <span>Photo Ready for Analysis</span>
-                  </div>
-                </div>
-
-                <div className="preview-action-buttons">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={handleRetakeCamera}
-                    disabled={loading}
-                  >
-                    <Icon name="refreshCw" size={16} />
-                    <span>Retake Photo</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-large"
-                    onClick={handleTriggerAnalysis}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="btn-spinner" />
-                        <span>Analysing Label...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Analyse Captured Label</span>
-                        <Icon name="arrowRight" size={18} />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="scanning-tips-bar">
-              <div className="tip-item">💡 Hold camera steady with adequate lighting</div>
-              <div className="tip-item">🔍 Ensure ingredient text is sharp and legible</div>
-              <div className="tip-item">↔️ Keep text orientation horizontal</div>
-            </div>
-          </div>
-        )}
-
-        {/* MODE B: UPLOAD IMAGE */}
-        {activeScanMode === "upload" && (
-          <div className="upload-scan-layout">
-            {uploadError && (
-              <div className="alert-banner alert-warning" style={{ marginBottom: "1rem" }}>
-                <Icon name="alertTriangle" size={18} />
-                <span>{uploadError}</span>
-              </div>
-            )}
-
-            {!uploadedImage ? (
-              <div
-                className="dropzone-area"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current && fileInputRef.current.click()}
-              >
-                <div className="dropzone-inner">
-                  <div className="dropzone-icon-circle">
-                    <Icon name="upload" size={32} color="#059669" />
-                  </div>
-                  <h3>Drag & drop food packaging photo here</h3>
-                  <p>Or click to browse from your computer or phone</p>
-                  <span className="dropzone-support-text">
-                    Supports PNG, JPG, JPEG, WebP (high resolution recommended)
-                  </span>
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden-file-input"
-                  accept="image/png, image/jpeg, image/jpg, image/webp"
-                  disabled={loading}
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleFileProcess(e.target.files[0]);
-                    }
+                  onUserMediaError={(err) => {
+                    setCameraError("Camera access denied or unavailable: " + (err.message || err));
                   }}
                 />
-              </div>
-            ) : (
-              <div className="uploaded-preview-container">
-                <div className="uploaded-file-banner">
-                  <div className="file-info-left">
-                    <Icon name="fileText" size={20} color="#059669" />
-                    <div>
-                      <span className="file-name">{uploadedFileName || "Selected Packaging Image"}</span>
-                      <span className="file-ready-tag">Ready for OCR Extraction</span>
-                    </div>
+                <div className="camera-target-crosshairs">
+                  <div className="crosshair-bracket top-left" />
+                  <div className="crosshair-bracket top-right" />
+                  <div className="crosshair-bracket bottom-left" />
+                  <div className="crosshair-bracket bottom-right" />
+                  <div className="crosshair-prompt-pill">
+                    <Icon name="camera" size={14} color="#ffffff" />
+                    <span>Align ingredient label inside frame</span>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={handleRemoveUploadedImage}
-                    title="Remove or replace image"
-                  >
-                    <Icon name="x" size={16} />
-                    <span>Replace Image</span>
-                  </button>
                 </div>
-
-                <div className="uploaded-img-view">
-                  <img src={uploadedImage} alt="Uploaded packaging label" className="uploaded-preview-img" />
-                </div>
-
-                <div className="preview-action-buttons">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={handleRemoveUploadedImage}
-                    disabled={loading}
-                  >
-                    <Icon name="trash2" size={16} />
-                    <span>Remove</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-large"
-                    onClick={handleTriggerAnalysis}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="btn-spinner" />
-                        <span>Analysing Label...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Analyse Product</span>
-                        <Icon name="arrowRight" size={18} />
-                      </>
-                    )}
-                  </button>
+              </>
+            ) : (
+              <div className="captured-preview-container">
+                <img src={capturedImage} alt="Captured food label" className="captured-preview-img" />
+                <div className="preview-overlay-badge">
+                  <Icon name="checkCircle" size={16} color="#16A34A" />
+                  <span>Packaging Image Captured</span>
                 </div>
               </div>
             )}
           </div>
-        )}
 
-        {/* MODE C: MANUAL INGREDIENT TEXT */}
-        {activeScanMode === "text" && (
-          <div className="manual-text-scan-layout">
-            <div className="manual-text-header">
-              <label className="form-label" htmlFor="manual-text-input">
-                Ingredient Declaration Text
-              </label>
-              <span className="helper-hint">
-                Paste ingredient text directly from an e-commerce or label declaration:
-              </span>
+          {cameraError && (
+            <div className="alert-banner alert-danger" style={{ marginTop: "1rem" }}>
+              <Icon name="alertTriangle" size={18} />
+              <span>{cameraError}</span>
             </div>
+          )}
 
-            {/* Quick Formulation Presets */}
-            <div className="sample-presets-chips">
-              <span className="presets-label">⚡ Quick Samples:</span>
-              {PRESET_FORMULATIONS.map((p, idx) => (
+          <div className="scan-controls-bar">
+            {!capturedImage ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-large btn-capture"
+                onClick={handleCapture}
+                disabled={loading}
+              >
+                <Icon name="camera" size={20} />
+                <span>Capture Packaging Photo</span>
+              </button>
+            ) : (
+              <div className="captured-actions-row">
                 <button
-                  key={idx}
                   type="button"
-                  className={`chip-btn ${manualText === p.text ? "active" : ""}`}
-                  onClick={() => setManualText(p.text)}
+                  className="btn btn-outline"
+                  onClick={handleRetakeCamera}
                   disabled={loading}
                 >
-                  <strong>{p.name}</strong>
-                  <span className="chip-desc">{p.tag}</span>
+                  <Icon name="refreshCw" size={16} />
+                  <span>Retake Photo</span>
                 </button>
-              ))}
-            </div>
 
-            <textarea
-              id="manual-text-input"
-              className="form-textarea"
-              rows={5}
-              placeholder="e.g. Ingredients: Water, Sugar, Acidity Regulators (INS 330, INS 331), Preservative (INS 211), Synthetic Food Colour (INS 102). CONTAINS PERMITTED FLAVOURS."
-              value={manualText}
-              onChange={(e) => setManualText(e.target.value)}
-              disabled={loading}
-            />
-
-            <div className="textarea-footer-row">
-              <span className="char-count">
-                {manualText.length} characters • {manualText.trim() ? manualText.trim().split(/\s+/).length : 0} words
-              </span>
-              {manualText && (
                 <button
                   type="button"
-                  className="btn-text-danger"
-                  onClick={() => setManualText("")}
+                  className="btn btn-primary btn-large"
+                  onClick={handleAnalyzeActiveScan}
+                  disabled={loading}
                 >
-                  Clear text
+                  {loading ? (
+                    <>
+                      <div className="btn-spinner" />
+                      <span>Analysing Packaging...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="activity" size={18} />
+                      <span>Analyse Ingredients</span>
+                    </>
+                  )}
                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVE MODE 2: IMAGE UPLOAD */}
+      {activeScanMode === "upload" && (
+        <div className="card clinical-scan-card">
+          {!uploadedImage ? (
+            <div
+              className="clinical-dropzone"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => handleFileProcess(e.target.files[0])}
+              />
+              <div className="dropzone-icon-circle">
+                <Icon name="upload" size={32} color="#00454A" />
+              </div>
+              <h3 className="dropzone-title">Upload Ingredient Packaging Photo</h3>
+              <p className="dropzone-sub">
+                Drag and drop your label photograph here, or <span className="dropzone-link">browse files</span>
+              </p>
+              <span className="dropzone-spec">Supports JPG, PNG, WEBP up to 15MB</span>
+            </div>
+          ) : (
+            <div className="uploaded-preview-wrap">
+              <div className="uploaded-preview-header">
+                <div className="uploaded-file-meta">
+                  <Icon name="fileText" size={18} color="#00454A" />
+                  <span className="file-name-text">{uploadedFileName || "Uploaded Packaging Label"}</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-danger"
+                  onClick={handleRemoveUploaded}
+                  disabled={loading}
+                >
+                  <Icon name="trash2" size={15} />
+                  <span>Remove</span>
+                </button>
+              </div>
+
+              <div className="uploaded-image-preview-box">
+                <img src={uploadedImage} alt="Uploaded packaging label" className="uploaded-image-preview" />
+              </div>
+
+              <div className="uploaded-actions-bar">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  disabled={loading}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => handleFileProcess(e.target.files[0])}
+                  />
+                  <Icon name="refreshCw" size={16} />
+                  <span>Replace Image</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-large"
+                  onClick={handleAnalyzeActiveScan}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="btn-spinner" />
+                      <span>Processing Label...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="activity" size={18} />
+                      <span>Analyse Uploaded Image</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {uploadError && (
+            <div className="alert-banner alert-danger" style={{ marginTop: "1rem" }}>
+              <Icon name="alertTriangle" size={18} />
+              <span>{uploadError}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ACTIVE MODE 3: BARCODE SCANNER (OPTIONAL) */}
+      {activeScanMode === "barcode" && (
+        <div className="card clinical-scan-card">
+          <div className="barcode-input-container">
+            <div className="barcode-header-group">
+              <div className="header-icon-box">
+                <Icon name="barcode" size={24} color="#00454A" />
+              </div>
+              <div>
+                <h3 className="barcode-title">Search by Product EAN-13 Barcode</h3>
+                <p className="barcode-sub">
+                  Retrieve verified ingredient schedules from Open Food Facts or benchmark catalogs.
+                </p>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginTop: "1.25rem" }}>
+              <label className="form-label" htmlFor="barcode-field">
+                EAN-13 Barcode (13 digits):
+              </label>
+              <div className="input-with-icon">
+                <Icon name="barcode" size={20} className="input-leading-icon" />
+                <input
+                  id="barcode-field"
+                  type="text"
+                  className="form-input barcode-input"
+                  value={barcodeInput}
+                  onChange={(e) => handleBarcodeChange(e.target.value)}
+                  placeholder="e.g. 8901234567890"
+                  maxLength={13}
+                  disabled={loading}
+                />
+              </div>
+              {barcodeFeedback && (
+                <span className={`barcode-hint ${barcodeFeedback.includes("✓") ? "valid" : "neutral"}`}>
+                  {barcodeFeedback}
+                </span>
               )}
             </div>
 
-            <div className="preview-action-buttons" style={{ marginTop: "1rem" }}>
+            <div className="barcode-sample-chips">
+              <span className="sample-label">Benchmark Test Products:</span>
+              <div className="chips-row">
+                {SAMPLE_BENCHMARK_PRODUCTS.map((prod) => (
+                  <button
+                    key={prod.ean}
+                    type="button"
+                    className="sample-chip-btn"
+                    onClick={() => handleBarcodeChange(prod.ean)}
+                  >
+                    <span>{prod.name}</span>
+                    <span className="chip-code">({prod.ean})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="scan-controls-bar" style={{ marginTop: "1.5rem" }}>
               <button
                 type="button"
                 className="btn btn-primary btn-large btn-block"
-                onClick={handleTriggerAnalysis}
-                disabled={loading || !manualText.trim()}
+                onClick={handleAnalyzeActiveScan}
+                disabled={loading || !barcodeInput.trim()}
               >
                 {loading ? (
                   <>
                     <div className="btn-spinner" />
-                    <span>Analysing Formulation...</span>
+                    <span>Searching Product Catalog...</span>
                   </>
                 ) : (
                   <>
-                    <span>Analyse Product</span>
-                    <Icon name="arrowRight" size={18} />
+                    <Icon name="search" size={18} />
+                    <span>Lookup & Verify Barcode</span>
                   </>
                 )}
               </button>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* SEPARATE, VISUALLY DISTINCT OPTIONAL BARCODE SECTION */}
-      <div className="optional-barcode-container card glass">
-        <div
-          className="optional-barcode-header"
-          onClick={() => setShowBarcodeSection(!showBarcodeSection)}
-          style={{ cursor: "pointer" }}
-        >
-          <div className="barcode-header-left">
-            <div className="barcode-icon-circle">
-              <Icon name="barcode" size={20} color="#2563eb" />
-            </div>
-            <div>
-              <div className="barcode-title-row">
-                <h3>Have a Product Barcode? (Optional)</h3>
-                <span className="badge-optional">Optional Step</span>
-              </div>
-              <p className="barcode-desc">
-                Scanning the barcode retrieves catalog information from Open Food Facts. Physical label scanning is the primary source of truth.
-              </p>
-            </div>
-          </div>
-          <button type="button" className="btn btn-ghost btn-sm" aria-label="Toggle barcode section">
-            <Icon name={showBarcodeSection ? "chevronUp" : "chevronDown"} size={20} />
-          </button>
         </div>
+      )}
 
-        {showBarcodeSection && (
-          <div className="optional-barcode-body">
-            <form onSubmit={handleBarcodeSubmit} className="barcode-entry-form">
-              <div className="barcode-input-group">
-                <div className="input-with-icon" style={{ flex: 1 }}>
-                  <Icon name="barcode" size={18} className="input-leading-icon" />
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={barcodeInput}
-                    onChange={(e) => handleBarcodeChange(e.target.value)}
-                    placeholder="Enter 13-digit EAN barcode (e.g. 8901234567890)"
-                    maxLength={13}
-                    disabled={loading}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-outline"
-                  disabled={loading || !barcodeInput.trim()}
-                >
-                  <Icon name="search" size={16} />
-                  <span>Lookup Barcode</span>
-                </button>
-              </div>
+      {/* ACTIVE MODE 4: MANUAL INGREDIENT TEXT */}
+      {activeScanMode === "text" && (
+        <div className="card clinical-scan-card">
+          <div className="manual-text-container">
+            <label className="form-label" htmlFor="manual-text-area">
+              Paste Packaging Ingredient Declaration:
+            </label>
+            <textarea
+              id="manual-text-area"
+              rows={5}
+              className="form-textarea"
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              placeholder="e.g. Ingredients: Refined Wheat Flour, Sugar, Palm Oil, Acidity Regulators (INS 330, INS 331), Preservative (INS 211), Synthetic Food Colour (INS 102). CONTAINS WHEAT."
+              disabled={loading}
+            />
 
-              {barcodeFeedback && (
-                <div className={`barcode-feedback-tag ${barcodeFeedback.includes("Valid") ? "valid" : "warning"}`}>
-                  {barcodeFeedback}
-                </div>
-              )}
-            </form>
-
-            <div className="barcode-benchmarks">
-              <span className="benchmarks-title">Or test with catalog benchmarks:</span>
-              <div className="benchmark-pills-row">
-                {SAMPLE_BENCHMARK_PRODUCTS.map((prod) => (
-                  <button
-                    key={prod.ean}
-                    type="button"
-                    className="benchmark-pill"
-                    onClick={() => handleSelectBenchmark(prod.ean)}
-                    disabled={loading}
-                  >
-                    <span className="pill-name">{prod.name}</span>
-                    <span className="pill-code">{prod.ean}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Loading Overlay */}
-      {loading && (
-        <div className="analysis-progress-overlay">
-          <div className="progress-modal-card card glass">
-            <div className="progress-spinner-ring" />
-            <h3>Evaluating Food Formulation</h3>
-            <p>
-              Applying computer vision OCR preprocessing, matching additives against verified INS taxonomy, and assessing dietary suitability...
-            </p>
-            <div className="progress-micro-indicators">
-              <span>✓ Multimodal OCR</span>
-              <span>•</span>
-              <span>✓ 750+ INS Taxonomy</span>
-              <span>•</span>
-              <span>✓ Allergen Gate</span>
+            <div className="scan-controls-bar" style={{ marginTop: "1.25rem" }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-large btn-block"
+                onClick={handleAnalyzeActiveScan}
+                disabled={loading || !manualText.trim()}
+              >
+                {loading ? (
+                  <>
+                    <div className="btn-spinner" />
+                    <span>Parsing Formulation...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="activity" size={18} />
+                    <span>Analyse Ingredient Text</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* OCR Comparison & Benchmark Modal */}
-      <OcrComparisonModal
-        isOpen={showComparisonModal}
-        onClose={() => setShowComparisonModal(false)}
-        activeImage={
-          activeScanMode === "camera"
-            ? capturedImage
-            : activeScanMode === "upload"
-            ? uploadedImage
-            : null
-        }
-        activeMode={activeScanMode}
-        ocrConfig={ocrConfig}
-      />
+      {/* SUBTLE DEVELOPER / AUDIT DIAGNOSTICS ACCORDION */}
+      <div className="card clinical-diagnostics-card">
+        <button
+          type="button"
+          className="diagnostics-toggle-btn"
+          onClick={() => setShowDevDiagnostics(!showDevDiagnostics)}
+          aria-expanded={showDevDiagnostics}
+        >
+          <div className="diagnostics-toggle-left">
+            <Icon name="sliders" size={15} color="#64748B" />
+            <span>Developer Diagnostics: OCR Preprocessing & Comparison Pipeline</span>
+          </div>
+          <Icon name={showDevDiagnostics ? "chevronUp" : "chevronDown"} size={15} color="#64748B" />
+        </button>
+
+        {showDevDiagnostics && (
+          <div className="diagnostics-body">
+            <p className="diagnostics-sub">
+              Evaluate real-time differences between baseline raw Tesseract (Configuration A) and the enhanced OpenCV CLAHE & adaptive preprocessing engine (Configuration B).
+            </p>
+
+            <div className="diagnostics-actions-row">
+              <div className="diagnostics-config-picker">
+                <span className="config-label">Active OCR Engine:</span>
+                <div className="config-segmented">
+                  <button
+                    type="button"
+                    className={`config-pill ${ocrConfig === "B" ? "active" : ""}`}
+                    onClick={() => setOcrConfig("B")}
+                  >
+                    Configuration B (OpenCV + Tesseract)
+                  </button>
+                  <button
+                    type="button"
+                    className={`config-pill ${ocrConfig === "A" ? "active" : ""}`}
+                    onClick={() => setOcrConfig("A")}
+                  >
+                    Configuration A (Raw Tesseract)
+                  </button>
+                </div>
+              </div>
+
+              {activeImage && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setShowComparisonModal(true)}
+                >
+                  <Icon name="activity" size={14} />
+                  <span>Launch Side-by-Side OCR Comparison</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Side-by-Side OCR Comparison Modal */}
+      {showComparisonModal && (
+        <OcrComparisonModal
+          isOpen={showComparisonModal}
+          onClose={() => setShowComparisonModal(false)}
+          activeImage={activeImage}
+        />
+      )}
     </div>
   );
 }

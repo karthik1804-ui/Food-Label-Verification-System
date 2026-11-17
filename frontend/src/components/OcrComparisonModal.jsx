@@ -300,7 +300,7 @@ export default function OcrComparisonModal({
                               </span>
                             </td>
                             <td>
-                              <span className="mono-code font-semibold" style={{ color: "#059669" }}>
+                              <span className="mono-code font-semibold" style={{ color: "#16A34A" }}>
                                 {s.config_b.detected_codes.join(", ") || "(none)"}
                               </span>
                             </td>
@@ -410,7 +410,7 @@ export default function OcrComparisonModal({
                       <h4>OpenCV Preprocessed + Tesseract</h4>
                     </div>
                     <div className="comp-meta-row">
-                      <span style={{ color: "#059669", fontWeight: 600 }}>
+                      <span style={{ color: "#16A34A", fontWeight: 600 }}>
                         Confidence: {Math.round(liveComparisonResult.config_b.confidence * 100)}%
                       </span>
                       <span>Words: {liveComparisonResult.config_b.word_count}</span>

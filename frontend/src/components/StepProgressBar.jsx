@@ -12,24 +12,31 @@ export default function StepProgressBar({ currentStep, onSelectStep, currentUser
     },
     {
       num: 2,
-      title: "Dietary Profile",
-      desc: "Preferences & Allergens",
-      icon: "leaf",
+      title: "Allergies",
+      desc: "Configure Sensitivities",
+      icon: "shieldAlert",
       isReady: true
     },
     {
       num: 3,
-      title: "Product Scan",
-      desc: "Photo, Image or Text",
-      icon: "camera",
+      title: "Preferences",
+      desc: "Dietary & Additives",
+      icon: "leaf",
       isReady: true
     },
     {
       num: 4,
-      title: "Personalised Results",
-      desc: "Suitability & Safety",
+      title: "Product Scan",
+      desc: "Photo, Image or Code",
+      icon: "camera",
+      isReady: true
+    },
+    {
+      num: 5,
+      title: "Results",
+      desc: "Personalised Analysis",
       icon: "shieldCheck",
-      isReady: currentStep >= 4
+      isReady: currentStep >= 5
     }
   ];
 
@@ -39,7 +46,7 @@ export default function StepProgressBar({ currentStep, onSelectStep, currentUser
         {steps.map((s, idx) => {
           const isCompleted = currentStep > s.num;
           const isActive = currentStep === s.num;
-          const isClickable = s.num <= currentStep || (s.num === 1) || (s.num === 2) || (s.num === 3);
+          const isClickable = s.num <= currentStep || (s.num <= 4);
 
           return (
             <React.Fragment key={s.num}>
@@ -49,10 +56,11 @@ export default function StepProgressBar({ currentStep, onSelectStep, currentUser
                 onClick={() => isClickable && onSelectStep(s.num)}
                 disabled={!isClickable}
                 aria-current={isActive ? "step" : undefined}
+                title={`Navigate to Step ${s.num}: ${s.title}`}
               >
                 <div className="step-circle">
                   {isCompleted ? (
-                    <Icon name="check" size={16} strokeWidth={2.5} color="#ffffff" />
+                    <Icon name="check" size={15} strokeWidth={2.5} color="#ffffff" />
                   ) : (
                     <span>{s.num}</span>
                   )}

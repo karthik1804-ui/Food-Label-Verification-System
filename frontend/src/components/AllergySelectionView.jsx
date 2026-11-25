@@ -157,10 +157,9 @@ export default function AllergySelectionView({
     <div className="clinical-page-container">
       {/* Page Header */}
       <div className="clinical-page-header">
-        <span className="clinical-kicker">Step 2 • Safety Profile</span>
-        <h1 className="clinical-title">Select Your Food Allergies</h1>
+        <h1 className="clinical-title">Select Food Allergies</h1>
         <p className="clinical-description">
-          Choose the food items you want to avoid. We will highlight matching allergens during product analysis.
+          Choose any ingredients you are allergic to or want to avoid.
         </p>
       </div>
 
@@ -225,20 +224,12 @@ export default function AllergySelectionView({
                   <span className="allergy-emoji">{item.icon}</span>
                 </div>
                 <div className={`allergy-check-circle ${isSelected ? "checked" : ""}`}>
-                  {isSelected && <Icon name="check" size={14} strokeWidth={3} color="#ffffff" />}
+                  {isSelected && <Icon name="check" size={14} strokeWidth={3} color="#00454A" />}
                 </div>
               </div>
 
               <div className="allergy-card-body">
                 <h3 className="allergy-name">{item.label}</h3>
-                <p className="allergy-desc">{item.sublabel}</p>
-              </div>
-
-              <div className="allergy-card-footer">
-                <span className="allergy-category-tag">{item.category}</span>
-                <span className={`allergy-status-indicator ${isSelected ? "active" : ""}`}>
-                  {isSelected ? "Avoided" : "Permitted"}
-                </span>
               </div>
             </div>
           );
@@ -301,7 +292,7 @@ export default function AllergySelectionView({
             onClick={handleSaveAndContinue}
             disabled={saving}
           >
-            <span>{saving ? "Saving..." : "Continue to Dietary Preferences"}</span>
+            <span>{saving ? "Saving..." : "Continue to Preferences"}</span>
             <Icon name="arrowRight" size={16} />
           </button>
         </div>

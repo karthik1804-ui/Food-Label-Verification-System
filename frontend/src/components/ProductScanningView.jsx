@@ -177,10 +177,9 @@ export default function ProductScanningView({
     <div className="clinical-page-container">
       {/* Page Header */}
       <div className="clinical-page-header">
-        <span className="clinical-kicker">Step 4 • Product Scanning</span>
         <h1 className="clinical-title">Scan Your Food Product</h1>
         <p className="clinical-description">
-          Capture or upload the ingredient declaration to analyse its contents against your personalised dietary preferences.
+          Capture or upload the ingredients label to analyse your product.
         </p>
       </div>
 
@@ -219,7 +218,7 @@ export default function ProductScanningView({
           onClick={() => setActiveScanMode("text")}
         >
           <Icon name="fileText" size={18} />
-          <span>Manual Text</span>
+          <span>Enter Ingredient Text</span>
         </button>
       </div>
 
@@ -538,58 +537,55 @@ export default function ProductScanningView({
         </div>
       )}
 
-      {/* SUBTLE DEVELOPER / AUDIT DIAGNOSTICS ACCORDION */}
-      <div className="card clinical-diagnostics-card">
+      {/* ADVANCED / DEVELOPER OCR SETTINGS (DISCRETE COLLAPSIBLE) */}
+      <div style={{ marginTop: "1.5rem", textAlign: "center" }}>
         <button
           type="button"
-          className="diagnostics-toggle-btn"
+          className="btn btn-ghost btn-xs text-muted"
           onClick={() => setShowDevDiagnostics(!showDevDiagnostics)}
           aria-expanded={showDevDiagnostics}
+          style={{ fontSize: "0.75rem" }}
         >
-          <div className="diagnostics-toggle-left">
-            <Icon name="sliders" size={15} color="#64748B" />
-            <span>Developer Diagnostics: OCR Preprocessing & Comparison Pipeline</span>
-          </div>
-          <Icon name={showDevDiagnostics ? "chevronUp" : "chevronDown"} size={15} color="#64748B" />
+          <Icon name="sliders" size={13} />
+          <span>{showDevDiagnostics ? "Hide Advanced OCR Settings" : "Advanced OCR Settings"}</span>
+          <Icon name={showDevDiagnostics ? "chevronUp" : "chevronDown"} size={13} />
         </button>
 
         {showDevDiagnostics && (
-          <div className="diagnostics-body">
-            <p className="diagnostics-sub">
-              Evaluate real-time differences between baseline raw Tesseract (Configuration A) and the enhanced OpenCV CLAHE & adaptive preprocessing engine (Configuration B).
-            </p>
-
-            <div className="diagnostics-actions-row">
-              <div className="diagnostics-config-picker">
-                <span className="config-label">Active OCR Engine:</span>
-                <div className="config-segmented">
-                  <button
-                    type="button"
-                    className={`config-pill ${ocrConfig === "B" ? "active" : ""}`}
-                    onClick={() => setOcrConfig("B")}
-                  >
-                    Configuration B (OpenCV + Tesseract)
-                  </button>
-                  <button
-                    type="button"
-                    className={`config-pill ${ocrConfig === "A" ? "active" : ""}`}
-                    onClick={() => setOcrConfig("A")}
-                  >
-                    Configuration A (Raw Tesseract)
-                  </button>
+          <div className="card clinical-diagnostics-card" style={{ marginTop: "0.75rem", textAlign: "left" }}>
+            <div className="diagnostics-body" style={{ padding: "1rem" }}>
+              <div className="diagnostics-actions-row">
+                <div className="diagnostics-config-picker">
+                  <span className="config-label">Active OCR Pipeline:</span>
+                  <div className="config-segmented">
+                    <button
+                      type="button"
+                      className={`config-pill ${ocrConfig === "B" ? "active" : ""}`}
+                      onClick={() => setOcrConfig("B")}
+                    >
+                      Configuration B (OpenCV + Tesseract)
+                    </button>
+                    <button
+                      type="button"
+                      className={`config-pill ${ocrConfig === "A" ? "active" : ""}`}
+                      onClick={() => setOcrConfig("A")}
+                    >
+                      Configuration A (Raw Tesseract)
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {activeImage && (
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => setShowComparisonModal(true)}
-                >
-                  <Icon name="activity" size={14} />
-                  <span>Launch Side-by-Side OCR Comparison</span>
-                </button>
-              )}
+                {activeImage && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setShowComparisonModal(true)}
+                  >
+                    <Icon name="activity" size={14} />
+                    <span>Side-by-Side OCR Comparison</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

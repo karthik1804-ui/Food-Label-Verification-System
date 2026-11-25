@@ -1051,13 +1051,13 @@ button, input, select, textarea {
   background-color: #ffffff;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1.15rem;
+  padding: 1rem 1.15rem;
   cursor: pointer;
   transition: all 0.15s ease;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 150px;
+  min-height: 100px;
 }
 
 .allergy-card:hover {
@@ -1952,6 +1952,21 @@ button, input, select, textarea {
   letter-spacing: -0.03em;
 }
 
+.meter-score-alert {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.meter-score-status-text {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--danger);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
 .meter-score-max {
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -1988,8 +2003,70 @@ button, input, select, textarea {
 .product-title-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.hero-alert-pill {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #b91c1c;
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.hero-detected-triggers-banner {
+  background-color: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+  margin: 0.65rem 0 0.85rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.hero-detected-triggers-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #9f1239;
+}
+
+.hero-detected-triggers-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.hero-trigger-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: #ffffff;
+  border: 1px solid #fda4af;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.hero-chip-allergen {
+  color: #be123c;
+  font-weight: 800;
+}
+
+.hero-chip-term {
+  color: var(--text-main);
+  font-weight: 500;
 }
 
 .product-source-tag, .evaluated-profile-pill {

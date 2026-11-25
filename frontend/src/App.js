@@ -413,7 +413,7 @@ function App() {
             </button>
             <div className="header-status-indicator">
               <span className="status-dot online" />
-              <span className="header-status-text">Codex Alimentarius & FSSAI Verified Taxonomy</span>
+              <span className="header-status-text">System Active</span>
             </div>
           </div>
 
@@ -661,14 +661,10 @@ function App() {
           onClose={() => setShowAuditModal(false)}
         />
 
-        {/* Clinical Application Footer */}
+        {/* Clean Application Footer */}
         <footer className="clinical-main-footer">
           <div className="footer-content">
-            <span>
-              &copy; {new Date().getFullYear()} Food Label Verification System • Multimodal Health-Tech Intelligence
-            </span>
-            <span className="footer-sep">•</span>
-            <span>Codex Alimentarius & FSSAI Standards</span>
+            <span>&copy; {new Date().getFullYear()} Food Label Verification System</span>
           </div>
         </footer>
       </div>

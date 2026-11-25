@@ -106,10 +106,10 @@ export default function AuditQueueModal({ isOpen, onClose }) {
             </div>
             <div>
               <h2 id="audit-modal-title" className="modal-heading">
-                Human-in-the-Loop Audit & Taxonomy Queue
+                HITL Audit Queue
               </h2>
               <p className="modal-subtext">
-                Expert verification queue for unmapped additive formulation tokens and taxonomy reconciliation.
+                Review and verify unmapped ingredient tokens and taxonomy assignments.
               </p>
             </div>
           </div>
@@ -144,15 +144,11 @@ export default function AuditQueueModal({ isOpen, onClose }) {
             </div>
             <div className="audit-stat-pill success">
               <span className="stat-number">{stats.confirmed_count}</span>
-              <span className="stat-name">Confirmed Non-Additives</span>
+              <span className="stat-name">Confirmed</span>
             </div>
             <div className="audit-stat-pill info">
               <span className="stat-number">{stats.corrected_count}</span>
-              <span className="stat-name">Corrected Mappings</span>
-            </div>
-            <div className="audit-stat-pill danger">
-              <span className="stat-number">{stats.rejected_count}</span>
-              <span className="stat-name">False Positives</span>
+              <span className="stat-name">Corrected</span>
             </div>
           </div>
         )}
@@ -209,11 +205,9 @@ export default function AuditQueueModal({ isOpen, onClose }) {
             <table className="clinical-table audit-table">
               <thead>
                 <tr>
-                  <th>Timestamp</th>
                   <th>Product Context</th>
                   <th>Unmapped Tokens</th>
-                  <th>Taxonomy Match</th>
-                  <th>OCR Conf.</th>
+                  <th>Match Conf.</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -226,16 +220,16 @@ export default function AuditQueueModal({ isOpen, onClose }) {
                   return (
                     <React.Fragment key={r.id || r.timestamp}>
                       <tr className={isReviewing ? "row-expanded" : ""}>
-                        <td className="text-muted text-xs">
-                          {r.timestamp ? new Date(r.timestamp).toLocaleString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit"
-                          }) : "N/A"}
-                        </td>
                         <td>
                           <strong>{r.context_identifier || "Direct Scan"}</strong>
+                          <div className="text-muted text-xs" style={{ marginTop: "0.15rem" }}>
+                            {r.timestamp ? new Date(r.timestamp).toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            }) : "N/A"}
+                          </div>
                         </td>
                         <td>
                           <div className="unmapped-tokens-wrap">
@@ -252,11 +246,6 @@ export default function AuditQueueModal({ isOpen, onClose }) {
                         <td>
                           {r.additive_match_confidence !== undefined
                             ? `${Math.round(r.additive_match_confidence * 100)}%`
-                            : "100%"}
-                        </td>
-                        <td>
-                          {r.ocr_confidence !== undefined
-                            ? `${Math.round(r.ocr_confidence * 100)}%`
                             : "100%"}
                         </td>
                         <td>
@@ -288,7 +277,7 @@ export default function AuditQueueModal({ isOpen, onClose }) {
                       {/* Expandable Review / History Drawer */}
                       {isReviewing && (
                         <tr className="expanded-detail-row">
-                          <td colSpan={7}>
+                          <td colSpan={5}>
                             <div className="audit-review-drawer">
                               <h4 className="drawer-title">
                                 Reviewing Record #{r.id} • Tokens: <strong>{(r.unmapped_tokens || []).join(", ")}</strong>

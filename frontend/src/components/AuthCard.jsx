@@ -115,15 +115,15 @@ export default function AuthCard({ onAuthSuccess, onContinueAsGuest, currentUser
         <div className="brand-side-content">
           <div className="brand-badge-pill">
             <Icon name="shieldCheck" size={16} color="#D6FF65" />
-            <span>Health-Tech Verification System</span>
+            <span>Health-Tech Verification</span>
           </div>
 
           <h1 className="brand-hero-title">
-            Evidence-Based Food Label Verification
+            Food Label Verification
           </h1>
 
           <p className="brand-hero-desc">
-            Empowering consumers, allergic individuals, and clinical dietitians with transparent ingredient analysis, Codex Alimentarius taxonomy mapping, and personalised safety scoring.
+            Smart ingredient analysis and personalised verification tailored to your dietary preferences and food sensitivities.
           </p>
 
           <div className="clinical-features-list">
@@ -132,8 +132,8 @@ export default function AuthCard({ onAuthSuccess, onContinueAsGuest, currentUser
                 <Icon name="shieldAlert" size={18} color="#D6FF65" />
               </div>
               <div className="feature-text">
-                <strong>Configurable Allergen Defense</strong>
-                <span>Scans packaging formulations for the Top 11 major allergen families.</span>
+                <strong>Allergen Defense</strong>
+                <span>Scans packaging formulations for major food allergen triggers.</span>
               </div>
             </div>
 
@@ -142,8 +142,8 @@ export default function AuthCard({ onAuthSuccess, onContinueAsGuest, currentUser
                 <Icon name="activity" size={18} color="#D6FF65" />
               </div>
               <div className="feature-text">
-                <strong>Codex & FSSAI Additive Taxonomy</strong>
-                <span>Instant classification across 750+ food additive codes and synonyms.</span>
+                <strong>Additive Avoidance</strong>
+                <span>Detects food preservatives, synthetic colours, and sweeteners.</span>
               </div>
             </div>
 
@@ -152,15 +152,15 @@ export default function AuthCard({ onAuthSuccess, onContinueAsGuest, currentUser
                 <Icon name="camera" size={18} color="#D6FF65" />
               </div>
               <div className="feature-text">
-                <strong>OpenCV Enhanced Optical OCR</strong>
-                <span>CLAHE contrast balancing and adaptive thresholding for packaging curves.</span>
+                <strong>Label Scanning</strong>
+                <span>Optical character recognition from camera photos and uploads.</span>
               </div>
             </div>
           </div>
 
           <div className="clinical-trust-footer">
             <Icon name="shieldCheck" size={16} color="#D6FF65" />
-            <span>Deterministic Rule-Based Intelligence • Zero Fabricated Claims</span>
+            <span>Personalised Food Label Verification</span>
           </div>
         </div>
       </div>

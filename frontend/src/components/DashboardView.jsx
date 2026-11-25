@@ -71,28 +71,25 @@ export default function DashboardView({
           <Icon name="user" size={26} color="#00454A" />
         </div>
         <div>
-          <span className="welcome-kicker">Healthcare Verification Portal</span>
           <h1 className="welcome-title">
-            Welcome Back, {currentUser ? currentUser.username : "Guest User"}
+            Welcome Back{currentUser ? `, ${currentUser.username}` : ""}
           </h1>
           <p className="welcome-desc">
-            Your personal clinical dietary verification center. Scan food packaging to verify ingredients against your active preferences.
+            Manage your food preferences and scan products.
           </p>
         </div>
       </div>
 
-      {/* DASHBOARD GRID: SECTION A & SECTION B */}
+      {/* DASHBOARD GRID: MAIN SCAN ACTION & DIETARY PROFILE */}
       <div className="dashboard-hero-grid">
-        {/* SECTION B: PRIMARY SCAN ACTION (MAIN FOCUS) */}
+        {/* PRIMARY SCAN ACTION (MAIN PROMINENT ELEMENT) */}
         <div className="card dashboard-primary-scan-card">
-          <div className="primary-scan-badge">
-            <Icon name="activity" size={14} color="#00454A" />
-            <span>Primary Healthcare Action</span>
+          <div>
+            <h2 className="primary-scan-title">Scan a Food Product</h2>
+            <p className="primary-scan-desc">
+              Check ingredients against your dietary preferences.
+            </p>
           </div>
-          <h2 className="primary-scan-title">Scan a Food Product</h2>
-          <p className="primary-scan-desc">
-            Check packaging ingredients or barcodes instantly against your personal allergy triggers and avoided food additives.
-          </p>
           <div className="primary-scan-actions">
             <button
               type="button"
@@ -100,13 +97,13 @@ export default function DashboardView({
               onClick={onNavigateScan}
             >
               <Icon name="camera" size={18} />
-              <span>Launch Product Scanner</span>
+              <span>Scan Product</span>
               <Icon name="arrowRight" size={16} />
             </button>
           </div>
         </div>
 
-        {/* SECTION A: DIETARY PROFILE SUMMARY */}
+        {/* DIETARY PROFILE SUMMARY */}
         <div className="card dashboard-profile-summary-card">
           <div className="summary-card-header">
             <div className="header-icon-box">
@@ -114,25 +111,24 @@ export default function DashboardView({
             </div>
             <div>
               <h3 className="summary-title">Dietary Profile Summary</h3>
-              <span className="summary-subtitle">Active verification parameters</span>
             </div>
           </div>
 
           <div className="summary-stats-list">
             <div className="stat-row">
-              <span className="stat-label">Active Lifestyle Preset:</span>
+              <span className="stat-label">Selected Lifestyle:</span>
               <span className="stat-badge preset-badge">{presetName}</span>
             </div>
 
             <div className="stat-row">
-              <span className="stat-label">Configured Allergens:</span>
+              <span className="stat-label">Selected Allergens:</span>
               <span className="stat-badge allergen-badge">
-                {allergenCount} {allergenCount === 1 ? "trigger" : "triggers"}
+                {allergenCount} {allergenCount === 1 ? "allergen" : "allergens"}
               </span>
             </div>
 
             <div className="stat-row">
-              <span className="stat-label">Avoided Additive Classes:</span>
+              <span className="stat-label">Additive Categories:</span>
               <span className="stat-badge categories-badge">
                 {additiveCategoriesCount} {additiveCategoriesCount === 1 ? "category" : "categories"}
               </span>
@@ -152,173 +148,94 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* SECTION C: RECENT SCANS & SECTION D: QUICK ACTIONS */}
-      <div className="dashboard-secondary-grid">
-        {/* SECTION C: RECENT SCANS */}
-        <div className="card dashboard-recent-scans-card">
-          <div className="section-card-header justify-between">
-            <div className="flex-row items-center gap-md">
-              <div className="header-icon-box">
-                <Icon name="history" size={18} color="#00454A" />
-              </div>
-              <div>
-                <h3 className="section-heading">Recent Product Analyses</h3>
-                <p className="section-subtext">Last evaluated food items</p>
-              </div>
+      {/* RECENT SCANS SECTION (CLEAN & MINIMAL) */}
+      <div className="card dashboard-recent-scans-card" style={{ marginTop: "1.5rem" }}>
+        <div className="section-card-header justify-between">
+          <div className="flex-row items-center gap-md">
+            <div className="header-icon-box">
+              <Icon name="history" size={18} color="#00454A" />
             </div>
+            <div>
+              <h3 className="section-heading">Recent Scans</h3>
+            </div>
+          </div>
 
+          {recentScans.length > 0 && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
               onClick={onNavigateHistory}
             >
-              <span>View All History</span>
+              <span>View All</span>
               <Icon name="chevronRight" size={14} />
             </button>
-          </div>
-
-          {loadingScans ? (
-            <div className="empty-subtle-box">
-              <div className="btn-spinner" />
-              <p>Loading recent scans...</p>
-            </div>
-          ) : recentScans.length === 0 ? (
-            <div className="empty-subtle-box">
-              <span style={{ fontSize: "1.75rem" }}>📦</span>
-              <h4>No scans recorded yet</h4>
-              <p>Scan your first food packaging label or enter a barcode to build your clinical history.</p>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={onNavigateScan}
-                style={{ marginTop: "0.5rem" }}
-              >
-                Scan Product Now
-              </button>
-            </div>
-          ) : (
-            <div className="recent-scans-list">
-              {recentScans.map((item) => {
-                const score = item.personal_score !== undefined ? item.personal_score : item.safety_score;
-                const hasAllergen = item.has_allergens || (item.allergen_alerts && item.allergen_alerts.length > 0);
-
-                let badgeColor = "#16A34A";
-                let badgeText = "Compatible";
-                if (hasAllergen) {
-                  badgeColor = "#DC2626";
-                  badgeText = "Allergen Alert";
-                } else if (score < 70) {
-                  badgeColor = "#DC2626";
-                  badgeText = "Conflicts";
-                } else if (score < 90) {
-                  badgeColor = "#F59E0B";
-                  badgeText = "Caution";
-                }
-
-                return (
-                  <div
-                    key={item.id}
-                    className="recent-scan-item"
-                    onClick={() => onSelectScanRecord && onSelectScanRecord(item)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className="recent-item-icon">
-                      <Icon name={item.ean ? "barcode" : "camera"} size={16} color="#00454A" />
-                    </div>
-
-                    <div className="recent-item-info">
-                      <strong className="recent-product-name">{item.product_name}</strong>
-                      <span className="recent-scan-date">{formatDate(item.created_at)}</span>
-                    </div>
-
-                    <div className="recent-item-score-col">
-                      <span className="recent-score-pill" style={{ color: badgeColor, borderColor: `${badgeColor}40` }}>
-                        {hasAllergen ? "!" : score}
-                      </span>
-                      <span className="recent-verdict-label" style={{ color: badgeColor }}>
-                        {badgeText}
-                      </span>
-                    </div>
-
-                    <Icon name="chevronRight" size={16} color="#94A3B8" />
-                  </div>
-                );
-              })}
-            </div>
           )}
         </div>
 
-        {/* SECTION D: QUICK ACTIONS */}
-        <div className="card dashboard-quick-actions-card">
-          <div className="section-card-header">
-            <div className="header-icon-box">
-              <Icon name="sparkles" size={18} color="#00454A" />
-            </div>
-            <div>
-              <h3 className="section-heading">Quick Shortcuts</h3>
-              <p className="section-subtext">Immediate actions</p>
-            </div>
+        {loadingScans ? (
+          <div className="empty-subtle-box" style={{ padding: "1.5rem" }}>
+            <div className="btn-spinner" />
+            <p>Loading recent scans...</p>
           </div>
-
-          <div className="quick-actions-grid">
-            <button
-              type="button"
-              className="quick-action-btn"
-              onClick={onNavigateScan}
-            >
-              <div className="action-btn-icon">
-                <Icon name="camera" size={18} color="#00454A" />
-              </div>
-              <div className="action-btn-text">
-                <strong>Scan Packaging</strong>
-                <span>Camera OCR or Barcode</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="quick-action-btn"
-              onClick={onNavigateAllergies}
-            >
-              <div className="action-btn-icon">
-                <Icon name="shieldAlert" size={18} color="#00454A" />
-              </div>
-              <div className="action-btn-text">
-                <strong>Food Allergies</strong>
-                <span>Configure 11 allergens</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="quick-action-btn"
-              onClick={onNavigatePreferences}
-            >
-              <div className="action-btn-icon">
-                <Icon name="sliders" size={18} color="#00454A" />
-              </div>
-              <div className="action-btn-text">
-                <strong>Additive Avoidances</strong>
-                <span>Preservatives, dyes, MSG</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="quick-action-btn"
-              onClick={onOpenAudit}
-            >
-              <div className="action-btn-icon">
-                <Icon name="clipboardList" size={18} color="#00454A" />
-              </div>
-              <div className="action-btn-text">
-                <strong>HITL Audit Queue</strong>
-                <span>Review unmapped tokens</span>
-              </div>
-            </button>
+        ) : recentScans.length === 0 ? (
+          <div className="empty-subtle-box" style={{ padding: "1.5rem" }}>
+            <p className="text-muted" style={{ margin: 0 }}>
+              No recent scans yet. Use "Scan a Food Product" above to evaluate your first product.
+            </p>
           </div>
-        </div>
+        ) : (
+          <div className="recent-scans-list">
+            {recentScans.map((item) => {
+              const score = item.personal_score !== undefined ? item.personal_score : item.safety_score;
+              const hasAllergen = item.has_allergens || (item.allergen_alerts && item.allergen_alerts.length > 0);
+
+              let badgeColor = "#16A34A";
+              let badgeText = "Compatible";
+              if (hasAllergen) {
+                badgeColor = "#DC2626";
+                badgeText = "Allergen Alert";
+              } else if (score < 70) {
+                badgeColor = "#DC2626";
+                badgeText = "Conflicts";
+              } else if (score < 90) {
+                badgeColor = "#F59E0B";
+                badgeText = "Caution";
+              }
+
+              return (
+                <div
+                  key={item.id}
+                  className="recent-scan-item"
+                  onClick={() => onSelectScanRecord && onSelectScanRecord(item)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="recent-item-icon">
+                    <Icon name={item.ean ? "barcode" : "camera"} size={16} color="#00454A" />
+                  </div>
+
+                  <div className="recent-item-info">
+                    <strong className="recent-product-name">{item.product_name}</strong>
+                    <span className="recent-scan-date">{formatDate(item.created_at)}</span>
+                  </div>
+
+                  <div className="recent-item-score-col">
+                    <span className="recent-score-pill" style={{ color: badgeColor, borderColor: `${badgeColor}40` }}>
+                      {hasAllergen ? "!" : score}
+                    </span>
+                    <span className="recent-verdict-label" style={{ color: badgeColor }}>
+                      {badgeText}
+                    </span>
+                  </div>
+
+                  <span className="btn btn-outline btn-xs" style={{ marginLeft: "0.5rem" }}>
+                    View Results
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

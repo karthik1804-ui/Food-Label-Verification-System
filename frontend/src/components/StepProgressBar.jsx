@@ -67,7 +67,6 @@ export default function StepProgressBar({ currentStep, onSelectStep, currentUser
                 </div>
                 <div className="step-content">
                   <span className="step-title">{s.title}</span>
-                  <span className="step-desc">{s.desc}</span>
                 </div>
               </button>
 

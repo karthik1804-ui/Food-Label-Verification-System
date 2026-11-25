@@ -11,6 +11,7 @@ export default function AnalysisResultsView({
 }) {
   const [activeTab, setActiveTab] = useState("additives"); // 'additives' | 'allergens' | 'rules' | 'raw' | 'recommendations'
   const [expandedIngredient, setExpandedIngredient] = useState(null);
+  const [showTechDetails, setShowTechDetails] = useState(false);
 
   if (!analysisResult) return null;
 
@@ -21,13 +22,21 @@ export default function AnalysisResultsView({
   const parsedAdditives = analysisResult.parsed_additives || [];
   const counterfactual = analysisResult.counterfactual_explanation || {};
 
+  const detectedCategories = Array.from(
+    new Set(
+      parsedAdditives.flatMap((item) =>
+        Array.isArray(item.functional_categories)
+          ? item.functional_categories
+          : item.class ? [item.class] : []
+      )
+    )
+  );
+
   const {
     personal_score = safetyIndicator.final_score || 100,
-    personal_verdict = "Compatible",
     allergen_alerts = [],
     preference_conflicts = [],
     caution_items = [],
-    preset_name = dietaryProfile?.preset_name || "custom",
     is_provisional = false,
     extraction_warning = "",
     recommendation = ""
@@ -35,7 +44,6 @@ export default function AnalysisResultsView({
 
   const hasAllergens = allergen_alerts && allergen_alerts.length > 0;
   const hasConflicts = preference_conflicts && preference_conflicts.length > 0;
-  const hasCautions = caution_items && caution_items.length > 0;
 
   // System audit confidence metrics
   const conf = systemAudit.confidence || {};
@@ -84,7 +92,6 @@ export default function AnalysisResultsView({
   };
 
   const scoreTheme = getScoreTheme(personal_score, hasAllergens);
-  const isBarcodeProduct = product.ean && product.ean !== "N/A" && product.name !== "Uploaded Packaging Scan" && product.name !== "Live Camera Capture" && product.name !== "Manual Ingredient Label";
 
   const toggleExpandIngredient = (idx) => {
     setExpandedIngredient(expandedIngredient === idx ? null : idx);
@@ -92,57 +99,11 @@ export default function AnalysisResultsView({
 
   return (
     <div className="clinical-page-container">
-      {/* Top Clinical Breadcrumb Action Bar */}
-      <div className="results-top-nav-bar">
-        <div className="nav-bar-left">
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={onScanAnother}
-          >
-            <Icon name="arrowLeft" size={14} />
-            <span>Scan Another</span>
-          </button>
-          {onBackToDashboard && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={onBackToDashboard}
-            >
-              <Icon name="layoutDashboard" size={14} />
-              <span>Dashboard</span>
-            </button>
-          )}
-        </div>
-
-        <div className="nav-bar-right">
-          {onOpenPreferences && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={onOpenPreferences}
-            >
-              <Icon name="sliders" size={14} />
-              <span>Update Preferences</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => window.print()}
-          >
-            <Icon name="download" size={14} />
-            <span>Export Report</span>
-          </button>
-        </div>
-      </div>
-
       {/* Page Heading */}
       <div className="clinical-page-header">
-        <span className="clinical-kicker">Step 5 • Personalised Results</span>
-        <h1 className="clinical-title">Your Product Analysis</h1>
+        <h1 className="clinical-title">Analysis Results</h1>
         <p className="clinical-description">
-          Ingredient verification evaluated deterministically against your configured dietary avoidances and allergen sensitivities.
+          Personalised ingredient evaluation based on your dietary preferences.
         </p>
       </div>
 
@@ -159,16 +120,27 @@ export default function AnalysisResultsView({
                 />
                 <path
                   className="meter-circle-fill"
-                  strokeDasharray={`${hasAllergens ? 20 : personal_score}, 100`}
+                  strokeDasharray={`${hasAllergens ? 100 : personal_score}, 100`}
                   style={{ stroke: scoreTheme.color }}
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
               </svg>
               <div className="meter-center-content">
-                <span className="meter-score-num" style={{ color: scoreTheme.color }}>
-                  {hasAllergens ? "!" : personal_score}
-                </span>
-                <span className="meter-score-max">/ 100</span>
+                {hasAllergens ? (
+                  <>
+                    <span className="meter-score-num meter-score-alert" style={{ color: scoreTheme.color }}>
+                      ⚠
+                    </span>
+                    <span className="meter-score-status-text">UNSUITABLE</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="meter-score-num" style={{ color: scoreTheme.color }}>
+                      {personal_score}
+                    </span>
+                    <span className="meter-score-max">/ 100</span>
+                  </>
+                )}
               </div>
             </div>
             <span className={`status-badge-hero ${scoreTheme.badgeClass}`}>
@@ -179,46 +151,54 @@ export default function AnalysisResultsView({
           {/* Product & Evaluation Context */}
           <div className="suitability-details-col">
             <div className="product-title-row">
-              <span className="product-source-tag">
-                <Icon name={isBarcodeProduct ? "barcode" : "camera"} size={13} color="#00454A" />
-                <span>{isBarcodeProduct ? `EAN ${product.ean}` : "Physical Label Scan"}</span>
-              </span>
-              <span className="evaluated-profile-pill">
-                <Icon name="leaf" size={13} color="#00454A" />
-                <span>Profile: <strong>{preset_name.replace("_", " ").toUpperCase()}</strong></span>
-              </span>
-              {personal_verdict && (
-                <span className="evaluated-profile-pill">
-                  <Icon name="checkCircle" size={13} color="#16A34A" />
-                  <span>Verdict: <strong>{personal_verdict}</strong></span>
+              <h2 className="product-main-name">
+                {product.name || "Scanned Formulation"}
+              </h2>
+              {hasAllergens && (
+                <span className="hero-alert-pill">
+                  {allergen_alerts.length} Allergen Trigger{allergen_alerts.length > 1 ? "s" : ""}
                 </span>
               )}
             </div>
-
-            <h2 className="product-main-name">
-              {product.name || "Scanned Formulation"}
-            </h2>
 
             {product.brand && (
               <span className="product-brand-line">Brand: <strong>{product.brand}</strong></span>
             )}
 
+            {/* DIRECT DETECTED INGREDIENTS CALLOUT BANNER WHEN ALLERGENS DETECTED */}
+            {hasAllergens && (
+              <div className="hero-detected-triggers-banner">
+                <div className="hero-detected-triggers-title">
+                  <Icon name="shieldAlert" size={16} color="#DC2626" />
+                  <span>Detected Allergen Matches:</span>
+                </div>
+                <div className="hero-detected-triggers-chips">
+                  {allergen_alerts.map((alert, idx) => (
+                    <span key={idx} className="hero-trigger-chip">
+                      <strong className="hero-chip-allergen">{alert.allergen?.toUpperCase()}</strong>
+                      <span className="hero-chip-term">("{alert.matched_term}")</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="suitability-explanation-text">
               {hasAllergens
-                ? "This product formulation contains one or more ingredient keywords matching your configured allergen sensitivities. Please do not consume if you have severe intolerances."
+                ? `Immediate warning: This food formulation contains ${allergen_alerts.map(a => `${a.allergen?.toUpperCase()} ("${a.matched_term}")`).join(", ")}. It conflicts directly with your active allergen profile.`
                 : is_provisional
-                ? "This compatibility score is provisional due to moderate OCR text clarity. Verify fine print on the physical label before consumption."
+                ? "This compatibility score is provisional due to moderate OCR text clarity. Verify fine print on the physical label."
                 : personal_score >= 90
-                ? "This product matches your configured dietary preferences. No conflicting food additives or restricted ingredients were detected."
+                ? "This product matches your configured dietary preferences. No conflicting food additives were detected."
                 : personal_score >= 70
-                ? "This product is mostly compatible with your profile, but contains minor additives or ingredients you prefer to limit."
-                : "This product contradicts one or more active dietary preferences. Review flagged chemical additives in the breakdown below."}
+                ? "This product is mostly compatible with your profile, but contains minor additives you prefer to limit."
+                : "This product contradicts one or more active dietary preferences. Review flagged additives in the breakdown below."}
             </p>
 
             <div className="clinical-disclaimer-callout">
               <Icon name="info" size={15} color="#2563EB" />
               <span>
-                <strong>Informational Verification:</strong> This is a personalised preference calculation based on your active profile, not a clinical medical diagnosis or food-safety certification.
+                <strong>Note:</strong> This score reflects your personal dietary preferences, not a clinical diagnosis or food-safety certification.
               </span>
             </div>
 
@@ -238,23 +218,23 @@ export default function AnalysisResultsView({
       <div className="clinical-metrics-grid">
         <div className="metric-card">
           <div className="metric-card-top">
-            <span className="metric-label">Total Ingredients / Additives</span>
+            <span className="metric-label">Detected Ingredients</span>
             <Icon name="activity" size={16} color="#00454A" />
           </div>
           <span className="metric-value">{parsedAdditives.length}</span>
-          <span className="metric-sub">Mapped from Codex / FSSAI taxonomy</span>
+          <span className="metric-sub">Total verified ingredients</span>
         </div>
 
         <div className="metric-card">
           <div className="metric-card-top">
-            <span className="metric-label">Preference Conflicts</span>
+            <span className="metric-label">Flagged Additives</span>
             <Icon name="sliders" size={16} color={hasConflicts ? "#DC2626" : "#16A34A"} />
           </div>
           <span className="metric-value" style={{ color: hasConflicts ? "#DC2626" : "#0F172A" }}>
             {preference_conflicts.length}
           </span>
           <span className="metric-sub">
-            Triggered score deductions{hasCautions ? ` (${caution_items.length} caution)` : ""}
+            {hasConflicts ? `${preference_conflicts.length} avoidances flagged` : "Zero preference conflicts"}
           </span>
         </div>
 
@@ -266,20 +246,18 @@ export default function AnalysisResultsView({
           <span className="metric-value" style={{ color: hasAllergens ? "#DC2626" : "#0F172A" }}>
             {allergen_alerts.length}
           </span>
-          <span className="metric-sub">Matched sensitivity keywords</span>
+          <span className="metric-sub">
+            {hasAllergens ? `${allergen_alerts.length} allergen matches` : "Zero allergens detected"}
+          </span>
         </div>
 
         <div className="metric-card">
           <div className="metric-card-top">
-            <span className="metric-label">OCR Optical Clarity</span>
-            <Icon name="camera" size={16} color="#2563EB" />
+            <span className="metric-label">Categories Detected</span>
+            <Icon name="leaf" size={16} color="#00454A" />
           </div>
-          <span className="metric-value" style={{ color: ocrConfidence >= 75 ? "#16A34A" : ocrConfidence >= 40 ? "#F59E0B" : "#DC2626" }}>
-            {ocrConfidence !== null ? `${ocrConfidence}%` : "100%"}
-          </span>
-          <span className="metric-sub">
-            {ocrConfidence >= 75 ? "Sharp optical capture" : ocrConfidence >= 40 ? "Moderate clarity" : "Low confidence (Provisional)"}
-          </span>
+          <span className="metric-value">{detectedCategories.length}</span>
+          <span className="metric-sub">Functional ingredient classes</span>
         </div>
       </div>
 
@@ -555,124 +533,140 @@ export default function AnalysisResultsView({
         )}
       </div>
 
-      {/* SECTION 4: VERIFICATION CONFIDENCE & QUALITY GAUGES */}
-      <div className="card clinical-section-card">
-        <div className="section-card-header">
-          <div className="header-icon-box">
-            <Icon name="shieldCheck" size={18} color="#2563EB" />
+      {/* SECTION 4: ADVANCED TECHNICAL DETAILS (COLLAPSIBLE ACCORDION) */}
+      <div className="card clinical-section-card accordion-card" style={{ marginTop: "1.5rem" }}>
+        <button
+          type="button"
+          className="clinical-accordion-trigger"
+          onClick={() => setShowTechDetails(!showTechDetails)}
+          aria-expanded={showTechDetails}
+        >
+          <div className="accordion-trigger-left">
+            <Icon name="sliders" size={16} color="#64748B" />
+            <span>Technical Verification & Optical Details</span>
           </div>
-          <div>
-            <h2 className="section-heading">Verification Confidence & Preprocessing</h2>
-            <p className="section-subtext">Measurement of optical character clarity, catalog lookup, and pipeline quality.</p>
-          </div>
-        </div>
+          <Icon name={showTechDetails ? "chevronUp" : "chevronDown"} size={16} color="#64748B" />
+        </button>
 
-        <div className="confidence-gauges-grid">
-          <div className="confidence-gauge-item">
-            <div className="gauge-top">
-              <span className="gauge-label">OCR Text Clarity</span>
-              <span className="gauge-val" style={{ color: ocrConfidence >= 75 ? "#16A34A" : ocrConfidence >= 40 ? "#F59E0B" : "#DC2626" }}>
-                {ocrConfidence !== null ? `${ocrConfidence}%` : "100%"}
-              </span>
-            </div>
-            <div className="gauge-track">
-              <div
-                className="gauge-fill"
-                style={{
-                  width: `${ocrConfidence !== null ? ocrConfidence : 100}%`,
-                  backgroundColor: ocrConfidence >= 75 ? "#16A34A" : ocrConfidence >= 40 ? "#F59E0B" : "#DC2626"
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="confidence-gauge-item">
-            <div className="gauge-top">
-              <span className="gauge-label">Taxonomy Match</span>
-              <span className="gauge-val" style={{ color: "#16A34A" }}>
-                {additiveConfidence !== null ? `${additiveConfidence}%` : "100%"}
-              </span>
-            </div>
-            <div className="gauge-track">
-              <div
-                className="gauge-fill"
-                style={{
-                  width: `${additiveConfidence !== null ? additiveConfidence : 100}%`,
-                  backgroundColor: "#16A34A"
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="confidence-gauge-item">
-            <div className="gauge-top">
-              <span className="gauge-label">Barcode Catalog Status</span>
-              <span className="gauge-badge">
-                {barcodeStatus === "valid_ean13" ? "✓ Verified EAN" : "Physical Label"}
-              </span>
-            </div>
-            <div className="gauge-track">
-              <div
-                className="gauge-fill"
-                style={{
-                  width: barcodeStatus === "valid_ean13" ? "100%" : "30%",
-                  backgroundColor: barcodeStatus === "valid_ean13" ? "#16A34A" : "#94A3B8"
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="confidence-gauge-item">
-            <div className="gauge-top">
-              <span className="gauge-label">Safety Decision Gate</span>
-              <span className="gauge-badge" style={{ color: is_provisional ? "#F59E0B" : "#16A34A" }}>
-                {is_provisional ? "⚠️ Provisional" : "✓ Verified"}
-              </span>
-            </div>
-            <div className="gauge-track">
-              <div
-                className="gauge-fill"
-                style={{
-                  width: "100%",
-                  backgroundColor: is_provisional ? "#F59E0B" : "#16A34A"
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Preprocessing Metrics Pill Banner */}
-        {(ocrPipelineConfig || preprocessingMetrics) && (
-          <div className="clinical-pipeline-banner">
-            <div className="pipeline-left">
-              <Icon name="sliders" size={15} color="#475569" />
-              <span>
-                <strong>Pipeline:</strong> {ocrPipelineConfig || "Configuration B (OpenCV + Tesseract)"}
-              </span>
-            </div>
-            {preprocessingMetrics && (
-              <div className="pipeline-badges-wrap">
-                <span className="pipeline-pill">
-                  Sharpness: {Math.round(preprocessingMetrics.sharpness_score || 0)}
-                  {preprocessingMetrics.is_blurry ? " (Blurry)" : " (Sharp)"}
-                </span>
-                <span className="pipeline-pill">
-                  Lighting: {Math.round((preprocessingMetrics.lighting_uniformity || 0) * 100)}%
-                  {preprocessingMetrics.has_uneven_lighting ? " (Uneven)" : " (Uniform)"}
-                </span>
-                {preprocessingMetrics.original_dims && (
-                  <span className="pipeline-pill">
-                    Resolution: {preprocessingMetrics.original_dims[0]}×{preprocessingMetrics.original_dims[1]}
-                    {preprocessingMetrics.upscaled ? " (Scaled)" : ""}
+        {showTechDetails && (
+          <div className="accordion-expandable-content" style={{ paddingTop: "1rem" }}>
+            <div className="confidence-gauges-grid">
+              <div className="confidence-gauge-item">
+                <div className="gauge-top">
+                  <span className="gauge-label">OCR Text Clarity</span>
+                  <span className="gauge-val" style={{ color: ocrConfidence >= 75 ? "#16A34A" : ocrConfidence >= 40 ? "#F59E0B" : "#DC2626" }}>
+                    {ocrConfidence !== null ? `${ocrConfidence}%` : "100%"}
                   </span>
+                </div>
+                <div className="gauge-track">
+                  <div
+                    className="gauge-fill"
+                    style={{
+                      width: `${ocrConfidence !== null ? ocrConfidence : 100}%`,
+                      backgroundColor: ocrConfidence >= 75 ? "#16A34A" : ocrConfidence >= 40 ? "#F59E0B" : "#DC2626"
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="confidence-gauge-item">
+                <div className="gauge-top">
+                  <span className="gauge-label">Taxonomy Match</span>
+                  <span className="gauge-val" style={{ color: "#16A34A" }}>
+                    {additiveConfidence !== null ? `${additiveConfidence}%` : "100%"}
+                  </span>
+                </div>
+                <div className="gauge-track">
+                  <div
+                    className="gauge-fill"
+                    style={{
+                      width: `${additiveConfidence !== null ? additiveConfidence : 100}%`,
+                      backgroundColor: "#16A34A"
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="confidence-gauge-item">
+                <div className="gauge-top">
+                  <span className="gauge-label">Barcode Catalog Status</span>
+                  <span className="gauge-badge">
+                    {barcodeStatus === "valid_ean13" ? "✓ Verified EAN" : "Physical Label"}
+                  </span>
+                </div>
+                <div className="gauge-track">
+                  <div
+                    className="gauge-fill"
+                    style={{
+                      width: barcodeStatus === "valid_ean13" ? "100%" : "30%",
+                      backgroundColor: barcodeStatus === "valid_ean13" ? "#16A34A" : "#94A3B8"
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="confidence-gauge-item">
+                <div className="gauge-top">
+                  <span className="gauge-label">Decision Gate</span>
+                  <span className="gauge-badge" style={{ color: is_provisional ? "#F59E0B" : "#16A34A" }}>
+                    {is_provisional ? "⚠️ Provisional" : "✓ Verified"}
+                  </span>
+                </div>
+                <div className="gauge-track">
+                  <div
+                    className="gauge-fill"
+                    style={{
+                      width: "100%",
+                      backgroundColor: is_provisional ? "#F59E0B" : "#16A34A"
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {(ocrPipelineConfig || preprocessingMetrics) && (
+              <div className="clinical-pipeline-banner" style={{ marginTop: "1rem" }}>
+                <div className="pipeline-left">
+                  <Icon name="sliders" size={15} color="#475569" />
+                  <span>
+                    <strong>Pipeline:</strong> {ocrPipelineConfig || "Configuration B (OpenCV + Tesseract)"}
+                  </span>
+                </div>
+                {preprocessingMetrics && (
+                  <div className="pipeline-badges-wrap">
+                    <span className="pipeline-pill">
+                      Sharpness: {Math.round(preprocessingMetrics.sharpness_score || 0)}
+                      {preprocessingMetrics.is_blurry ? " (Blurry)" : " (Sharp)"}
+                    </span>
+                    <span className="pipeline-pill">
+                      Lighting: {Math.round((preprocessingMetrics.lighting_uniformity || 0) * 100)}%
+                      {preprocessingMetrics.has_uneven_lighting ? " (Uneven)" : " (Uniform)"}
+                    </span>
+                    {preprocessingMetrics.original_dims && (
+                      <span className="pipeline-pill">
+                        Resolution: {preprocessingMetrics.original_dims[0]}×{preprocessingMetrics.original_dims[1]}
+                        {preprocessingMetrics.upscaled ? " (Scaled)" : ""}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             )}
+
+            {/* Extracted Raw OCR Text */}
+            <div style={{ marginTop: "1rem" }}>
+              <span className="detail-label" style={{ display: "block", marginBottom: "0.35rem" }}>
+                Extracted Raw OCR Text:
+              </span>
+              <pre className="clinical-raw-text-block">
+                {analysisResult.extracted_text || product.raw_ingredient_text || "No raw text available."}
+              </pre>
+            </div>
           </div>
         )}
       </div>
 
-      {/* SECTION 5: CLINICAL NAVIGATION FOOTER */}
+      {/* STICKY BOTTOM ACTIONS */}
       <div className="sticky-action-bar">
         <div className="action-bar-content">
           <button
@@ -681,17 +675,17 @@ export default function AnalysisResultsView({
             onClick={onScanAnother}
           >
             <Icon name="camera" size={16} />
-            <span>Scan Another Product</span>
+            <span>Scan Another</span>
           </button>
 
-          {onViewHistory && (
+          {onOpenPreferences && (
             <button
               type="button"
               className="btn btn-outline"
-              onClick={onViewHistory}
+              onClick={onOpenPreferences}
             >
-              <Icon name="history" size={16} />
-              <span>View Scan History</span>
+              <Icon name="sliders" size={16} />
+              <span>Update Preferences</span>
             </button>
           )}
 
@@ -702,7 +696,7 @@ export default function AnalysisResultsView({
               onClick={onBackToDashboard}
             >
               <Icon name="layoutDashboard" size={16} />
-              <span>Return to Dashboard</span>
+              <span>Back to Dashboard</span>
             </button>
           )}
         </div>

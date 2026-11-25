@@ -7,31 +7,31 @@ const PRESET_CARDS = [
   {
     key: "clean_label",
     title: "Clean Eating",
-    subtitle: "Zero synthetic dyes, artificial preservatives & synthetic sweeteners",
+    subtitle: "Zero synthetic dyes, preservatives & artificial sweeteners",
     icon: "leaf"
   },
   {
     key: "vegan",
     title: "Strict Vegan",
-    subtitle: "Avoids all animal-derived ingredients (Carmine, Gelatin, Shellac)",
+    subtitle: "Avoids all animal-derived ingredients",
     icon: "heart"
   },
   {
     key: "vegetarian",
     title: "Vegetarian",
-    subtitle: "Avoids meat-derived collagen, animal fats & bone phosphates",
+    subtitle: "Avoids animal fats and animal-derived additives",
     icon: "sparkles"
   },
   {
     key: "child_safe",
     title: "Low Additive",
-    subtitle: "Flags intense synthetic dyes & non-nutritive sweeteners",
+    subtitle: "Limits synthetic additives & artificial sweeteners",
     icon: "shieldCheck"
   },
   {
     key: "custom",
     title: "Custom Profile",
-    subtitle: "Tailor your exact avoided additive categories & chemical codes",
+    subtitle: "Tailor your exact avoided additives and chemical codes",
     icon: "sliders"
   }
 ];
@@ -166,10 +166,9 @@ export default function DietaryPreferencesView({
     <div className="clinical-page-container">
       {/* Page Header */}
       <div className="clinical-page-header">
-        <span className="clinical-kicker">Step 3 • Personalisation</span>
-        <h1 className="clinical-title">Your Dietary Preferences</h1>
+        <h1 className="clinical-title">Dietary Preferences</h1>
         <p className="clinical-description">
-          Personalise your food analysis experience. Pick a standard lifestyle preset or adjust specific chemical additive categories.
+          Choose a lifestyle preset or configure which additive categories to avoid.
         </p>
       </div>
 
@@ -188,7 +187,7 @@ export default function DietaryPreferencesView({
           </div>
           <div>
             <h2 className="section-heading">Lifestyle Presets</h2>
-            <p className="section-subtext">Choose a baseline profile to automatically configure standard ingredient avoidances.</p>
+            <p className="section-subtext">Select a standard profile to automatically configure ingredient avoidances.</p>
           </div>
         </div>
 
@@ -233,8 +232,8 @@ export default function DietaryPreferencesView({
             <Icon name="sliders" size={18} color="#00454A" />
           </div>
           <div>
-            <h2 className="section-heading">Additive Categories</h2>
-            <p className="section-subtext">Enable or disable specific functional food additive categories to avoid:</p>
+            <h2 className="section-heading">Additives to Avoid</h2>
+            <p className="section-subtext">Toggle functional additive categories to flag during analysis:</p>
           </div>
         </div>
 
@@ -247,7 +246,7 @@ export default function DietaryPreferencesView({
             />
             <div className="toggle-card-content">
               <span className="toggle-title">Synthetic / Artificial Colours</span>
-              <span className="toggle-sub">Tartrazine (INS 102), Sunset Yellow (INS 110), Allura Red (INS 129), Brilliant Blue.</span>
+              <span className="toggle-sub">Avoid artificial food dyes and synthetic colorants.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -260,7 +259,7 @@ export default function DietaryPreferencesView({
             />
             <div className="toggle-card-content">
               <span className="toggle-title">Chemical Preservatives</span>
-              <span className="toggle-sub">Sodium Benzoate (INS 211), Sodium Nitrite (INS 250), Potassium Sorbate (INS 202).</span>
+              <span className="toggle-sub">Avoid chemical shelf-life extenders and preservatives.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -273,7 +272,7 @@ export default function DietaryPreferencesView({
             />
             <div className="toggle-card-content">
               <span className="toggle-title">Non-Nutritive Sweeteners</span>
-              <span className="toggle-sub">Aspartame (INS 951), Sucralose (INS 955), Acesulfame-K (INS 950), Saccharin.</span>
+              <span className="toggle-sub">Avoid artificial, low-calorie, and intense sweeteners.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -286,7 +285,7 @@ export default function DietaryPreferencesView({
             />
             <div className="toggle-card-content">
               <span className="toggle-title">Flavour Enhancers & MSG</span>
-              <span className="toggle-sub">Monosodium Glutamate (INS 621), Disodium Inosinate & Guanylate (INS 627, 631).</span>
+              <span className="toggle-sub">Avoid added MSG and synthetic flavour enhancers.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -299,14 +298,14 @@ export default function DietaryPreferencesView({
             />
             <div className="toggle-card-content">
               <span className="toggle-title">Animal-Derived Additives</span>
-              <span className="toggle-sub">Gelatin (INS 428), Carmine / Cochineal (INS 120), Shellac (INS 904), Bone Phosphate.</span>
+              <span className="toggle-sub">Avoid gelatin, carmine, shellac, and animal derivatives.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
         </div>
       </div>
 
-      {/* SECTION 3: ALLERGEN ALERTS REVIEW */}
+      {/* SECTION 3: FOOD ALLERGIES SUMMARY */}
       <div className="card clinical-section-card">
         <div className="section-card-header justify-between">
           <div className="flex-row items-center gap-md">
@@ -314,8 +313,8 @@ export default function DietaryPreferencesView({
               <Icon name="shieldAlert" size={18} color="#00454A" />
             </div>
             <div>
-              <h2 className="section-heading">Configured Allergens</h2>
-              <p className="section-subtext">Allergens configured in Step 2 that will trigger priority warnings.</p>
+              <h2 className="section-heading">Food Allergies</h2>
+              <p className="section-subtext">Selected food sensitivities that trigger priority alerts.</p>
             </div>
           </div>
           {onBackToAllergies && (
@@ -325,17 +324,27 @@ export default function DietaryPreferencesView({
               onClick={onBackToAllergies}
             >
               <Icon name="sliders" size={14} />
-              <span>Modify Allergens</span>
+              <span>Edit Allergies</span>
             </button>
           )}
         </div>
 
         {selectedAllergens.length === 0 ? (
-          <div className="empty-subtle-box">
-            <span>No specific food allergens configured. Click "Modify Allergens" to add triggers.</span>
+          <div style={{ padding: "0.25rem 0", display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+            <span>No food allergens selected.</span>
+            {onBackToAllergies && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                onClick={onBackToAllergies}
+                style={{ textDecoration: "underline", color: "var(--dark-accent)", padding: 0 }}
+              >
+                Add Allergies
+              </button>
+            )}
           </div>
         ) : (
-          <div className="summary-pills-wrap" style={{ marginTop: "0.75rem" }}>
+          <div className="summary-pills-wrap" style={{ marginTop: "0.5rem" }}>
             {selectedAllergens.map((algId) => {
               const item = SUPPORTED_ALLERGENS.find((a) => a.id === algId);
               return (
@@ -380,7 +389,7 @@ export default function DietaryPreferencesView({
               placeholder="e.g. INS 102, INS 211, INS 621, E250, INS 150d"
             />
             <p className="helper-hint">
-              These codes will trigger personal deductions and cautionary badges during packaging analysis.
+              Specific additive codes that will trigger personal deductions and caution flags during packaging analysis.
             </p>
           </div>
         )}

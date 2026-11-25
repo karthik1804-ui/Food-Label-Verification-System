@@ -18,6 +18,7 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan, 
   const [page, setPage] = useState(0);
   const pageSize = 10;
   const [actionMessage, setActionMessage] = useState("");
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const loadHistory = useCallback(async (currentPage = page) => {
     setLoading(true);
@@ -108,68 +109,82 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan, 
 
   return (
     <div className="clinical-page-container">
-      {/* Top Breadcrumb Navigation */}
-      <div className="results-top-nav-bar">
-        <div className="nav-bar-left">
-          {onBackToDashboard && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={onBackToDashboard}
-            >
-              <Icon name="layoutDashboard" size={14} />
-              <span>Back to Dashboard</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={onBackToScan}
-          >
-            <Icon name="camera" size={14} />
-            <span>Scan New Product</span>
-          </button>
-        </div>
-
-        <div className="nav-bar-right">
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => handleExport("json")}
-            disabled={history.length === 0}
-          >
-            <Icon name="download" size={14} />
-            <span>Export JSON</span>
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => handleExport("csv")}
-            disabled={history.length === 0}
-          >
-            <Icon name="download" size={14} />
-            <span>Export CSV</span>
-          </button>
-          {history.length > 0 && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm text-danger"
-              onClick={handleClearAll}
-            >
-              <Icon name="trash2" size={14} />
-              <span>Clear All</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Page Header */}
+      {/* Page Header with Action Toolbar */}
       <div className="clinical-page-header">
-        <span className="clinical-kicker">Account Records</span>
-        <h1 className="clinical-title">Product Scan History</h1>
-        <p className="clinical-description">
-          Review past packaging analyses, inspect detected food additives, and track your historical dietary compatibility scores.
-        </p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
+          <div>
+            <h1 className="clinical-title">Scan History</h1>
+            <p className="clinical-description">
+              View and manage your past product ingredient scans.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={onBackToScan}
+            >
+              <Icon name="camera" size={14} />
+              <span>Scan Product</span>
+            </button>
+
+            {history.length > 0 && (
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                >
+                  <Icon name="download" size={14} />
+                  <span>Export</span>
+                </button>
+                {showExportMenu && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: "100%",
+                      marginTop: "0.25rem",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      boxShadow: "var(--shadow-md)",
+                      zIndex: 20,
+                      minWidth: "140px",
+                      overflow: "hidden"
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm btn-block"
+                      style={{ textAlign: "left", justifyContent: "flex-start", borderRadius: 0, padding: "0.5rem 0.75rem" }}
+                      onClick={() => { handleExport("json"); setShowExportMenu(false); }}
+                    >
+                      Export JSON
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm btn-block"
+                      style={{ textAlign: "left", justifyContent: "flex-start", borderRadius: 0, padding: "0.5rem 0.75rem" }}
+                      onClick={() => { handleExport("csv"); setShowExportMenu(false); }}
+                    >
+                      Export CSV
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm btn-block text-danger"
+                      style={{ textAlign: "left", justifyContent: "flex-start", borderRadius: 0, padding: "0.5rem 0.75rem" }}
+                      onClick={() => { handleClearAll(); setShowExportMenu(false); }}
+                    >
+                      Clear All History
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {actionMessage && (
@@ -322,6 +337,10 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan, 
                       </span>
                     )}
                   </div>
+
+                  <span className="btn btn-outline btn-xs" style={{ whiteSpace: "nowrap" }}>
+                    View Results
+                  </span>
 
                   <button
                     type="button"

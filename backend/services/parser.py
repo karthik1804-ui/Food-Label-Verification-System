@@ -445,6 +445,16 @@ def parse_additives_detailed(
         else:
             unmapped_tokens.append(token)
 
+    # Hybrid ML Inference for Unmapped Tokens
+    ml_classifications = []
+    try:
+        from services.ml_classifier import classify_ingredient_hybrid
+        for u_tok in unmapped_tokens:
+            ml_pred = classify_ingredient_hybrid(u_tok)
+            ml_classifications.append(ml_pred)
+    except Exception as ml_err:
+        logger.warning("ML classification for unmapped tokens failed: %s", str(ml_err))
+
     # Check for generic unnumbered category statements
     for pattern, category_name, explanation in GENERIC_CATEGORY_PATTERNS:
         match = re.search(pattern, text, re.IGNORECASE)
@@ -470,6 +480,7 @@ def parse_additives_detailed(
     return {
         "parsed_additives": parsed_additives,
         "unmapped_tokens": unmapped_tokens,
+        "ml_classifications": ml_classifications,
         "additive_match_confidence": additive_match_conf,
         "detected_categories": detected_categories,
         "individual_ins_codes": individual_ins_codes,

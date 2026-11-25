@@ -121,5 +121,71 @@
     ],
     "audit_status": "PENDING_EXPERT_REVIEW",
     "review_history": []
+  },
+  {
+    "id": "audit_1795190983978",
+    "timestamp": "2026-11-20T16:09:43.978055+00:00",
+    "context_identifier": "Live Camera Capture",
+    "unmapped_tokens": [
+      "INS 63"
+    ],
+    "raw_text_snippet": "AA (4 EDIBLE VEGETABLE OIL (CONTAINS ONE OR MORE OF THE FOLLOWINGS\nSRDRLEN, GROUNDNUT], **SEASONING [SUGAR MALTOOE TRIN, EDIBLE COMMON SAL!\nSPEC & CONDIMENTS (CHL (05%), PEPPER), DEHYDRATED VEGETABLE POWDER (ONION\nDARL TOMATO BLACK SALT ACIDITY REGULATOR (INS 330, INS 296, ING 334), MILK SOUS\n5 HYDR",
+    "additive_match_confidence": 0.85,
+    "ocr_confidence": 1.0,
+    "flag_reasons": [
+      "1 unrecognised additive token(s): INS 63"
+    ],
+    "audit_status": "PENDING_EXPERT_REVIEW",
+    "review_history": []
+  },
+  {
+    "id": "audit_1795191977448",
+    "timestamp": "2026-11-20T16:26:17.448945+00:00",
+    "context_identifier": "Uploaded Packaging Scan",
+    "unmapped_tokens": [
+      "INS 5330",
+      "INS 5236",
+      "INS 5334"
+    ],
+    "raw_text_snippet": "INGREDIENTS:         oi       ,                  } il\nPOTATO (84%), EDIBLE VEGETABLE OIL (CONTAINS ONE OR MORE OF THE FOLLOWINGS: ~~\nPALMOLEIN, GROUNDNUT), **SEASONING SUGAR, MALTODEXTRIN, EDIBLE COMMON SALT,\nSPICES & CONDIMENTS (CHILL (05%) PEPPER), DEHYDRATED VEGETABLE POWDER (ONION; ,\nGARLIC TOMA",
+    "additive_match_confidence": 0.82,
+    "ocr_confidence": 1.0,
+    "flag_reasons": [
+      "3 unrecognised additive token(s): INS 5330, INS 5236, INS 5334"
+    ],
+    "audit_status": "PENDING_EXPERT_REVIEW",
+    "review_history": []
+  },
+  {
+    "id": "audit_1795192038427",
+    "timestamp": "2026-11-20T16:27:18.427198+00:00",
+    "context_identifier": "Uploaded Packaging Scan",
+    "unmapped_tokens": [
+      "INS 14"
+    ],
+    "raw_text_snippet": "{TT\n§  INGREDIENTS: TE\nMedium Fat Ice Cream (77.78%):\nMilk & Milk Solids (From Cow/\nBuffalo), Water, Sugar, tguid\nGlucose, Emulsifier - INSI4 71, INS    |\n433, wn - (INS 412, INS      ]\n407 (s), INS 460 (INS 466),\nCONTAINS ADDED ARTIFIBAIL       y\nFLAVOURING SUBSTANG\n(Vanilla)       Tm",
+    "additive_match_confidence": 0.82,
+    "ocr_confidence": 1.0,
+    "flag_reasons": [
+      "1 unrecognised additive token(s): INS 14"
+    ],
+    "audit_status": "PENDING_EXPERT_REVIEW",
+    "review_history": []
+  },
+  {
+    "id": "audit_1795192150768",
+    "timestamp": "2026-11-20T16:29:10.768301+00:00",
+    "context_identifier": "Uploaded Packaging Scan",
+    "unmapped_tokens": [
+      "INS 160"
+    ],
+    "raw_text_snippet": "INGREDIENTS:           :    pS     -.\nPOTATO (84%), EDIBLE VEGETABLE OIL {CONTAINS ONE OR MORE OF THE FOLLOWINGS:\nDALMOLEIN, GROUNDNUT), **SEASONING (SUGAR, MALTODEXTRIN, EDIBLE COMMON SALT,\nSPICES & CONDIMENTS (CHILLI (0.5%), PEPPER), DEHYDRATED VEGETABLE POWDER (ONION;\nGARLIC TOMATO), BLACK SALT, ",
+    "additive_match_confidence": 0.87,
+    "ocr_confidence": 1.0,
+    "flag_reasons": [
+      "1 unrecognised additive token(s): INS 160"
+    ],
+    "audit_status": "PENDING_EXPERT_REVIEW",
+    "review_history": []
   }
 ]

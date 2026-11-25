@@ -1,56 +1,38 @@
 import React, { useState, useEffect } from "react";
 import { updateDietaryProfile } from "../api";
 import Icon from "./Icons";
-
-const ALLERGEN_OPTIONS = [
-  { id: "peanuts", label: "Peanuts", icon: "🥜" },
-  { id: "tree_nuts", label: "Tree Nuts (Almonds, Cashews)", icon: "🌰" },
-  { id: "dairy", label: "Dairy / Milk Solids", icon: "🥛" },
-  { id: "gluten", label: "Gluten / Wheat", icon: "🌾" },
-  { id: "soy", label: "Soy / Soybeans", icon: "🌱" },
-  { id: "egg", label: "Eggs & Albumin", icon: "🥚" },
-  { id: "fish", label: "Fish", icon: "🐟" },
-  { id: "shellfish", label: "Crustaceans / Shellfish", icon: "🦐" },
-  { id: "sesame", label: "Sesame", icon: "🥯" },
-  { id: "sulfites", label: "Sulfites (Sulphur Dioxide)", icon: "🍷" },
-  { id: "mustard", label: "Mustard", icon: "🌭" },
-];
+import { SUPPORTED_ALLERGENS } from "./AllergySelectionView";
 
 const PRESET_CARDS = [
   {
     key: "clean_label",
     title: "Clean Eating",
-    subtitle: "Zero synthetic dyes, preservatives & artificial enhancers",
-    icon: "leaf",
-    color: "#059669"
+    subtitle: "Zero synthetic dyes, preservatives & artificial sweeteners",
+    icon: "leaf"
   },
   {
     key: "vegan",
     title: "Strict Vegan",
-    subtitle: "Avoids all animal-derived additives (Carmine, Gelatin, Shellac)",
-    icon: "heart",
-    color: "#0284c7"
+    subtitle: "Avoids all animal-derived ingredients",
+    icon: "heart"
   },
   {
     key: "vegetarian",
     title: "Vegetarian",
-    subtitle: "Avoids meat-derived collagen, animal fats & bone phosphates",
-    icon: "sparkles",
-    color: "#7c3aed"
+    subtitle: "Avoids animal fats and animal-derived additives",
+    icon: "sparkles"
   },
   {
     key: "child_safe",
     title: "Low Additive",
-    subtitle: "Flags intense synthetic dyes & non-nutritive sweeteners",
-    icon: "shieldCheck",
-    color: "#d97706"
+    subtitle: "Limits synthetic additives & artificial sweeteners",
+    icon: "shieldCheck"
   },
   {
     key: "custom",
     title: "Custom Profile",
-    subtitle: "Tailor your exact avoided additive categories & allergens",
-    icon: "sliders",
-    color: "#475569"
+    subtitle: "Tailor your exact avoided additives and chemical codes",
+    icon: "sliders"
   }
 ];
 
@@ -58,6 +40,7 @@ export default function DietaryPreferencesView({
   currentProfile,
   onProfileSaved,
   onProceedToScan,
+  onBackToAllergies,
   currentUser
 }) {
   const [selectedPreset, setSelectedPreset] = useState("clean_label");
@@ -83,7 +66,6 @@ export default function DietaryPreferencesView({
       setSelectedAllergens(currentProfile.custom_allergens || []);
       setCustomAvoidIns((currentProfile.custom_avoid_ins || []).join(", "));
     } else {
-      // Default initial preset
       handlePresetSelect("clean_label");
     }
   }, [currentProfile]);
@@ -123,14 +105,6 @@ export default function DietaryPreferencesView({
     }
   };
 
-  const toggleAllergen = (id) => {
-    if (selectedAllergens.includes(id)) {
-      setSelectedAllergens(selectedAllergens.filter((a) => a !== id));
-    } else {
-      setSelectedAllergens([...selectedAllergens, id]);
-    }
-  };
-
   const handleSavePreferences = async (e) => {
     if (e) e.preventDefault();
     setSaving(true);
@@ -157,13 +131,12 @@ export default function DietaryPreferencesView({
     try {
       if (currentUser) {
         const res = await updateDietaryProfile(payload);
-        setStatusMessage({ text: "Preferences saved to your account!", type: "success" });
+        setStatusMessage({ text: "Preferences saved to your profile.", type: "success" });
         if (onProfileSaved && res.dietary_profile) {
           onProfileSaved(res.dietary_profile);
         }
       } else {
-        // Guest mode session update
-        setStatusMessage({ text: "Preferences saved for this session!", type: "success" });
+        setStatusMessage({ text: "Preferences active for this session.", type: "success" });
         if (onProfileSaved) {
           onProfileSaved(payload);
         }
@@ -171,33 +144,31 @@ export default function DietaryPreferencesView({
 
       setTimeout(() => {
         if (onProceedToScan) onProceedToScan();
-      }, 500);
+      }, 400);
     } catch (err) {
       console.error("Save preferences failed:", err);
-      // Even if network fails or guest mode, keep local preferences active
-      if (onProfileSaved) {
-        onProfileSaved(payload);
-      }
-      setStatusMessage({ text: "Preferences active locally. Proceeding...", type: "warning" });
-      setTimeout(() => {
-        if (onProceedToScan) onProceedToScan();
-      }, 700);
+      if (onProfileSaved) onProfileSaved(payload);
+      if (onProceedToScan) onProceedToScan();
     } finally {
       setSaving(false);
     }
   };
 
+  const activeCategoriesCount = [
+    avoidColors,
+    avoidPreserv,
+    avoidSweeteners,
+    avoidMsg,
+    avoidAnimal
+  ].filter(Boolean).length;
+
   return (
-    <div className="dietary-preferences-container">
-      {/* Header */}
-      <div className="section-intro-header">
-        <div className="section-badge">
-          <Icon name="leaf" size={16} />
-          <span>Step 2 of 4</span>
-        </div>
-        <h2>Configure Your Dietary Preferences</h2>
-        <p>
-          Select a preset or customize specific additives and allergens. Your product scans will be evaluated against these personal criteria.
+    <div className="clinical-page-container">
+      {/* Page Header */}
+      <div className="clinical-page-header">
+        <h1 className="clinical-title">Dietary Preferences</h1>
+        <p className="clinical-description">
+          Choose a lifestyle preset or configure which additive categories to avoid.
         </p>
       </div>
 
@@ -208,43 +179,61 @@ export default function DietaryPreferencesView({
         </div>
       )}
 
-      {/* 1. Visual Preset Selection Cards */}
-      <div className="preference-block">
-        <label className="preference-block-title">Choose a Lifestyle Preset</label>
-        <p className="preference-block-sub">Pick a preset to automatically populate recommended avoidance targets:</p>
+      {/* SECTION 1: LIFESTYLE PRESETS */}
+      <div className="card clinical-section-card">
+        <div className="section-card-header">
+          <div className="header-icon-box">
+            <Icon name="leaf" size={18} color="#00454A" />
+          </div>
+          <div>
+            <h2 className="section-heading">Lifestyle Presets</h2>
+            <p className="section-subtext">Select a standard profile to automatically configure ingredient avoidances.</p>
+          </div>
+        </div>
 
         <div className="preset-cards-grid">
           {PRESET_CARDS.map((card) => {
             const isSelected = selectedPreset === card.key;
             return (
-              <button
+              <div
                 key={card.key}
-                type="button"
+                role="button"
+                tabIndex={0}
                 className={`preset-card ${isSelected ? "selected" : ""}`}
                 onClick={() => handlePresetSelect(card.key)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handlePresetSelect(card.key);
+                  }
+                }}
+                aria-pressed={isSelected}
               >
                 <div className="preset-card-top">
-                  <div className="preset-card-icon" style={{ backgroundColor: `${card.color}15`, color: card.color }}>
-                    <Icon name={card.icon} size={22} />
+                  <div className="preset-card-icon">
+                    <Icon name={card.icon} size={20} color={isSelected ? "#00454A" : "#777C70"} />
                   </div>
-                  <div className="preset-radio-indicator">
-                    {isSelected ? <Icon name="check" size={14} strokeWidth={3} /> : null}
+                  <div className={`preset-radio-indicator ${isSelected ? "checked" : ""}`}>
+                    {isSelected && <Icon name="check" size={14} strokeWidth={3} color="#00454A" />}
                   </div>
                 </div>
                 <h3 className="preset-card-title">{card.title}</h3>
                 <p className="preset-card-desc">{card.subtitle}</p>
-              </button>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* 2. Specific Additive Categories to Avoid */}
-      <div className="preference-block">
-        <div className="preference-block-header">
+      {/* SECTION 2: ADDITIVE CATEGORIES TO AVOID */}
+      <div className="card clinical-section-card">
+        <div className="section-card-header">
+          <div className="header-icon-box">
+            <Icon name="sliders" size={18} color="#00454A" />
+          </div>
           <div>
-            <label className="preference-block-title">Additive Categories to Avoid</label>
-            <p className="preference-block-sub">Fine-tune individual functional additive classes:</p>
+            <h2 className="section-heading">Additives to Avoid</h2>
+            <p className="section-subtext">Toggle functional additive categories to flag during analysis:</p>
           </div>
         </div>
 
@@ -256,8 +245,8 @@ export default function DietaryPreferencesView({
               onChange={(e) => { setAvoidColors(e.target.checked); setSelectedPreset("custom"); }}
             />
             <div className="toggle-card-content">
-              <span className="toggle-title">🎨 Synthetic / Artificial Colours</span>
-              <span className="toggle-sub">Flags Tartrazine (INS 102), Sunset Yellow (INS 110), Allura Red, etc.</span>
+              <span className="toggle-title">Synthetic / Artificial Colours</span>
+              <span className="toggle-sub">Avoid artificial food dyes and synthetic colorants.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -269,8 +258,8 @@ export default function DietaryPreferencesView({
               onChange={(e) => { setAvoidPreserv(e.target.checked); setSelectedPreset("custom"); }}
             />
             <div className="toggle-card-content">
-              <span className="toggle-title">🛡️ Chemical Preservatives</span>
-              <span className="toggle-sub">Flags Sodium Benzoate (INS 211), Sodium Nitrite (INS 250), Sorbates.</span>
+              <span className="toggle-title">Chemical Preservatives</span>
+              <span className="toggle-sub">Avoid chemical shelf-life extenders and preservatives.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -282,8 +271,8 @@ export default function DietaryPreferencesView({
               onChange={(e) => { setAvoidSweeteners(e.target.checked); setSelectedPreset("custom"); }}
             />
             <div className="toggle-card-content">
-              <span className="toggle-title">🍬 Non-Nutritive Sweeteners</span>
-              <span className="toggle-sub">Flags Aspartame (INS 951), Sucralose (INS 955), Acesulfame-K (INS 950).</span>
+              <span className="toggle-title">Non-Nutritive Sweeteners</span>
+              <span className="toggle-sub">Avoid artificial, low-calorie, and intense sweeteners.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -295,8 +284,8 @@ export default function DietaryPreferencesView({
               onChange={(e) => { setAvoidMsg(e.target.checked); setSelectedPreset("custom"); }}
             />
             <div className="toggle-card-content">
-              <span className="toggle-title">🥣 Flavour Enhancers & MSG</span>
-              <span className="toggle-sub">Flags Monosodium Glutamate (INS 621), Disodium Inosinate/Guanylate (INS 627, 631).</span>
+              <span className="toggle-title">Flavour Enhancers & MSG</span>
+              <span className="toggle-sub">Avoid added MSG and synthetic flavour enhancers.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
@@ -308,60 +297,85 @@ export default function DietaryPreferencesView({
               onChange={(e) => { setAvoidAnimal(e.target.checked); setSelectedPreset("custom"); }}
             />
             <div className="toggle-card-content">
-              <span className="toggle-title">🐾 Animal-Derived Additives</span>
-              <span className="toggle-sub">Flags Gelatin (INS 428), Carmine Cochineal (INS 120), Shellac (INS 904).</span>
+              <span className="toggle-title">Animal-Derived Additives</span>
+              <span className="toggle-sub">Avoid gelatin, carmine, shellac, and animal derivatives.</span>
             </div>
             <div className="toggle-switch-ui" />
           </label>
         </div>
       </div>
 
-      {/* 3. Known Allergens & Intolerances */}
-      <div className="preference-block">
-        <label className="preference-block-title">Allergen Sensitivity Alerts</label>
-        <p className="preference-block-sub">
-          Select any allergens you want prominently flagged on every scanned label:
-        </p>
-
-        <div className="allergens-pill-grid">
-          {ALLERGEN_OPTIONS.map((alg) => {
-            const isSelected = selectedAllergens.includes(alg.id);
-            return (
-              <button
-                key={alg.id}
-                type="button"
-                className={`allergen-pill ${isSelected ? "selected" : ""}`}
-                onClick={() => toggleAllergen(alg.id)}
-              >
-                <span className="allergen-pill-emoji">{alg.icon}</span>
-                <span className="allergen-pill-label">{alg.label}</span>
-                <span className="allergen-pill-check">
-                  {isSelected ? <Icon name="check" size={14} /> : "+"}
-                </span>
-              </button>
-            );
-          })}
+      {/* SECTION 3: FOOD ALLERGIES SUMMARY */}
+      <div className="card clinical-section-card">
+        <div className="section-card-header justify-between">
+          <div className="flex-row items-center gap-md">
+            <div className="header-icon-box">
+              <Icon name="shieldAlert" size={18} color="#00454A" />
+            </div>
+            <div>
+              <h2 className="section-heading">Food Allergies</h2>
+              <p className="section-subtext">Selected food sensitivities that trigger priority alerts.</p>
+            </div>
+          </div>
+          {onBackToAllergies && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={onBackToAllergies}
+            >
+              <Icon name="sliders" size={14} />
+              <span>Edit Allergies</span>
+            </button>
+          )}
         </div>
+
+        {selectedAllergens.length === 0 ? (
+          <div style={{ padding: "0.25rem 0", display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+            <span>No food allergens selected.</span>
+            {onBackToAllergies && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                onClick={onBackToAllergies}
+                style={{ textDecoration: "underline", color: "var(--dark-accent)", padding: 0 }}
+              >
+                Add Allergies
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="summary-pills-wrap" style={{ marginTop: "0.5rem" }}>
+            {selectedAllergens.map((algId) => {
+              const item = SUPPORTED_ALLERGENS.find((a) => a.id === algId);
+              return (
+                <span key={algId} className="allergy-selected-pill static">
+                  <span>{item ? `${item.icon} ${item.label}` : algId}</span>
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* 4. Advanced Custom INS Avoidance Section */}
-      <div className="preference-block advanced-settings-block">
+      {/* SECTION 4: ADVANCED INS / E-NUMBER SETTINGS (COLLAPSED ACCORDION) */}
+      <div className="card clinical-section-card accordion-card">
         <button
           type="button"
-          className="advanced-toggle-btn"
+          className="clinical-accordion-trigger"
           onClick={() => setShowAdvanced(!showAdvanced)}
+          aria-expanded={showAdvanced}
         >
-          <div className="advanced-toggle-left">
-            <Icon name="settings" size={16} />
-            <span>Advanced: Custom INS / E-Number Codes</span>
+          <div className="accordion-trigger-left">
+            <Icon name="settings" size={16} color="#64748B" />
+            <span>Advanced: Custom Avoided INS / E-Number Codes</span>
           </div>
-          <Icon name={showAdvanced ? "chevronUp" : "chevronDown"} size={16} />
+          <Icon name={showAdvanced ? "chevronUp" : "chevronDown"} size={16} color="#64748B" />
         </button>
 
         {showAdvanced && (
-          <div className="advanced-content-body">
+          <div className="accordion-expandable-content">
             <label className="form-label" htmlFor="custom-ins-input">
-              Specific INS Codes to Avoid (comma-separated):
+              Specific INS or E-numbers to avoid (comma-separated):
             </label>
             <input
               id="custom-ins-input"
@@ -372,41 +386,50 @@ export default function DietaryPreferencesView({
                 setCustomAvoidIns(e.target.value);
                 setSelectedPreset("custom");
               }}
-              placeholder="e.g. INS 102, INS 211, INS 621, E250"
+              placeholder="e.g. INS 102, INS 211, INS 621, E250, INS 150d"
             />
             <p className="helper-hint">
-              Enter INS or E-number codes to generate tailored preference alerts during packaging analysis.
+              Specific additive codes that will trigger personal deductions and caution flags during packaging analysis.
             </p>
           </div>
         )}
       </div>
 
-      {/* Bottom Sticky Action Bar */}
-      <div className="preferences-action-bar">
-        <div className="action-bar-info">
-          <span>Active Preset: <strong>{selectedPreset.replace("_", " ").toUpperCase()}</strong></span>
-          <span>•</span>
-          <span>{selectedAllergens.length} allergen{selectedAllergens.length === 1 ? "" : "s"} tracked</span>
-        </div>
+      {/* Sticky Bottom Navigation Actions */}
+      <div className="sticky-action-bar">
+        <div className="action-bar-content">
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onBackToAllergies}
+            disabled={saving}
+          >
+            <Icon name="arrowLeft" size={16} />
+            <span>Back</span>
+          </button>
 
-        <button
-          type="button"
-          className="btn btn-primary btn-large"
-          onClick={handleSavePreferences}
-          disabled={saving}
-        >
-          {saving ? (
-            <>
-              <div className="btn-spinner" />
+          <div className="action-bar-summary">
+            <span className="summary-text">
+              Preset: <strong>{selectedPreset.replace("_", " ").toUpperCase()}</strong> • {activeCategoriesCount} categories • {selectedAllergens.length} allergens
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSavePreferences}
+            disabled={saving}
+          >
+            {saving ? (
               <span>Saving Preferences...</span>
-            </>
-          ) : (
-            <>
-              <span>Save & Proceed to Scan Product</span>
-              <Icon name="arrowRight" size={18} />
-            </>
-          )}
-        </button>
+            ) : (
+              <>
+                <span>Save Preferences & Continue</span>
+                <Icon name="arrowRight" size={16} />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

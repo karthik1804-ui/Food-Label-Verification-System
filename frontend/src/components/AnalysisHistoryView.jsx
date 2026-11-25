@@ -7,7 +7,7 @@ import {
 } from "../api";
 import Icon from "./Icons";
 
-export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }) {
+export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan, onBackToDashboard }) {
   const [history, setHistory] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -18,6 +18,7 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
   const [page, setPage] = useState(0);
   const pageSize = 10;
   const [actionMessage, setActionMessage] = useState("");
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const loadHistory = useCallback(async (currentPage = page) => {
     setLoading(true);
@@ -52,10 +53,10 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
 
   const handleDelete = async (recordId, e) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this scan record?")) return;
+    if (!window.confirm("Are you sure you want to remove this scan record?")) return;
     try {
       await deleteHistoryRecord(recordId);
-      setActionMessage("Scan record removed from your history.");
+      setActionMessage("Scan record removed from history.");
       loadHistory();
     } catch (err) {
       setError("Failed to delete record: " + (err.response?.data?.message || err.message));
@@ -63,10 +64,10 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
   };
 
   const handleClearAll = async () => {
-    if (!window.confirm("Warning: This will delete ALL scan history records for your account. Continue?")) return;
+    if (!window.confirm("Warning: This will permanently delete all scan records for your account. Continue?")) return;
     try {
       const res = await clearUserHistory();
-      setActionMessage(res.message || "History cleared.");
+      setActionMessage(res.message || "History cleared successfully.");
       loadHistory(0);
       setPage(0);
     } catch (err) {
@@ -107,47 +108,81 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
   };
 
   return (
-    <div className="analysis-history-page-container">
-      {/* Header */}
-      <div className="section-intro-header">
-        <div className="history-header-row">
+    <div className="clinical-page-container">
+      {/* Page Header with Action Toolbar */}
+      <div className="clinical-page-header">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
           <div>
-            <div className="section-badge">
-              <Icon name="history" size={16} />
-              <span>Past Scans</span>
-            </div>
-            <h2>Product Scan History</h2>
-            <p>Review and search past food label analyses and personalised dietary verdicts.</p>
+            <h1 className="clinical-title">Scan History</h1>
+            <p className="clinical-description">
+              View and manage your past product ingredient scans.
+            </p>
           </div>
 
-          <div className="history-header-actions">
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <button
               type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => handleExport("json")}
-              disabled={history.length === 0}
+              className="btn btn-primary btn-sm"
+              onClick={onBackToScan}
             >
-              <Icon name="download" size={14} />
-              <span>Export JSON</span>
+              <Icon name="camera" size={14} />
+              <span>Scan Product</span>
             </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => handleExport("csv")}
-              disabled={history.length === 0}
-            >
-              <Icon name="download" size={14} />
-              <span>Export CSV</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm text-danger"
-              onClick={handleClearAll}
-              disabled={history.length === 0}
-            >
-              <Icon name="trash2" size={14} />
-              <span>Clear History</span>
-            </button>
+
+            {history.length > 0 && (
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                >
+                  <Icon name="download" size={14} />
+                  <span>Export</span>
+                </button>
+                {showExportMenu && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: "100%",
+                      marginTop: "0.25rem",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      boxShadow: "var(--shadow-md)",
+                      zIndex: 20,
+                      minWidth: "140px",
+                      overflow: "hidden"
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm btn-block"
+                      style={{ textAlign: "left", justifyContent: "flex-start", borderRadius: 0, padding: "0.5rem 0.75rem" }}
+                      onClick={() => { handleExport("json"); setShowExportMenu(false); }}
+                    >
+                      Export JSON
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm btn-block"
+                      style={{ textAlign: "left", justifyContent: "flex-start", borderRadius: 0, padding: "0.5rem 0.75rem" }}
+                      onClick={() => { handleExport("csv"); setShowExportMenu(false); }}
+                    >
+                      Export CSV
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm btn-block text-danger"
+                      style={{ textAlign: "left", justifyContent: "flex-start", borderRadius: 0, padding: "0.5rem 0.75rem" }}
+                      onClick={() => { handleClearAll(); setShowExportMenu(false); }}
+                    >
+                      Clear All History
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -167,14 +202,14 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
       )}
 
       {/* Filter and Search Bar */}
-      <div className="card glass history-filter-card">
+      <div className="card clinical-filter-card">
         <form onSubmit={handleSearchSubmit} className="history-search-form">
           <div className="input-with-icon search-input-wrapper">
             <Icon name="search" size={18} className="input-leading-icon" />
             <input
               type="text"
               className="form-input"
-              placeholder="Search by product name, brand, or barcode..."
+              placeholder="Search by product name, brand, or barcode EAN..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -198,11 +233,12 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
                 checked={onlyAllergens}
                 onChange={(e) => setOnlyAllergens(e.target.checked)}
               />
-              <span>Allergens Only</span>
+              <span>Allergen Warnings Only</span>
             </label>
 
-            <button type="submit" className="btn btn-primary">
-              <span>Filter</span>
+            <button type="submit" className="btn btn-primary btn-sm">
+              <Icon name="filter" size={14} />
+              <span>Apply Filter</span>
             </button>
           </div>
         </form>
@@ -210,20 +246,20 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
 
       {/* History Items List / Cards */}
       {loading ? (
-        <div className="loading-card card glass">
-          <div className="btn-spinner" style={{ width: 32, height: 32 }} />
-          <p>Loading your past product scans...</p>
+        <div className="card empty-subtle-box">
+          <div className="btn-spinner" />
+          <p>Loading your past packaging scans...</p>
         </div>
       ) : history.length === 0 ? (
-        <div className="card glass empty-history-card">
+        <div className="card empty-subtle-box">
           <div className="empty-history-icon">
-            <Icon name="history" size={40} color="#94a3b8" />
+            <Icon name="history" size={36} color="#94A3B8" />
           </div>
-          <h3>No Past Scans Found</h3>
-          <p>
+          <h3 style={{ margin: "0.5rem 0" }}>No Past Scans Found</h3>
+          <p style={{ color: "#64748B", maxWidth: 440, margin: "0 auto 1rem auto" }}>
             {searchTerm || verdictFilter !== "all" || onlyAllergens
-              ? "No scan records matched your search filters. Try clearing your filters."
-              : "You have not performed any product scans yet. Start by scanning your first food label!"}
+              ? "No scan records match your active search filters. Try clearing your search parameters."
+              : "You have not performed any product scans yet. Scan your first food packaging label to get started."}
           </p>
           <button
             type="button"
@@ -239,18 +275,24 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
           {history.map((record) => {
             const hasAllergensInRecord = record.allergen_alerts && record.allergen_alerts.length > 0;
             const score = record.personal_score !== undefined ? record.personal_score : record.safety_score;
-            const scoreColor = hasAllergensInRecord ? "#dc2626" : score >= 90 ? "#059669" : score >= 70 ? "#d97706" : "#dc2626";
+            const scoreColor = hasAllergensInRecord ? "#DC2626" : score >= 90 ? "#16A34A" : score >= 70 ? "#F59E0B" : "#DC2626";
 
             return (
               <div
                 key={record.id}
-                className="card glass history-item-card"
+                className="card history-item-card"
                 onClick={() => onSelectScanRecord && onSelectScanRecord(record)}
+                role="button"
+                tabIndex={0}
               >
                 <div className="history-item-left">
                   <div
                     className="history-score-badge"
-                    style={{ backgroundColor: `${scoreColor}15`, color: scoreColor, borderColor: `${scoreColor}40` }}
+                    style={{
+                      backgroundColor: `${scoreColor}15`,
+                      color: scoreColor,
+                      borderColor: `${scoreColor}40`
+                    }}
                   >
                     <span className="history-score-num">{hasAllergensInRecord ? "!" : score}</span>
                     <span className="history-score-max">/100</span>
@@ -258,7 +300,7 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
 
                   <div className="history-item-info">
                     <div className="history-title-row">
-                      <h4>{record.product_name || "Food Product Scan"}</h4>
+                      <h4 className="history-prod-name">{record.product_name || "Food Product Scan"}</h4>
                       {record.brand && <span className="history-brand">{record.brand}</span>}
                     </div>
                     <div className="history-tags-row">
@@ -291,10 +333,14 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
                     </span>
                     {hasAllergensInRecord && (
                       <span className="history-allergen-flag">
-                        🚨 Allergen
+                        🚨 Allergen Warning
                       </span>
                     )}
                   </div>
+
+                  <span className="btn btn-outline btn-xs" style={{ whiteSpace: "nowrap" }}>
+                    View Results
+                  </span>
 
                   <button
                     type="button"
@@ -327,7 +373,7 @@ export default function AnalysisHistoryView({ onSelectScanRecord, onBackToScan }
               </button>
 
               <span className="pagination-info">
-                Page {page + 1} of {Math.ceil(totalCount / pageSize)} ({totalCount} total)
+                Page {page + 1} of {Math.ceil(totalCount / pageSize)} ({totalCount} total scans)
               </span>
 
               <button

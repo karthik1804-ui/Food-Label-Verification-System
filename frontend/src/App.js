@@ -7,14 +7,16 @@ import {
   preprocessOcrImage
 } from "./api";
 
-// Modern UI Components
+// Clinical UI Components
 import Icon from "./components/Icons";
 import StepProgressBar from "./components/StepProgressBar";
 import AuthCard from "./components/AuthCard";
+import AllergySelectionView from "./components/AllergySelectionView";
 import DietaryPreferencesView from "./components/DietaryPreferencesView";
 import ProductScanningView from "./components/ProductScanningView";
 import AnalysisResultsView from "./components/AnalysisResultsView";
 import AnalysisHistoryView from "./components/AnalysisHistoryView";
+import DashboardView from "./components/DashboardView";
 import AuditQueueModal from "./components/AuditQueueModal";
 
 import "./style.css";
@@ -92,11 +94,13 @@ const preprocessImageForOcr = (imageSrc, isUpload) => {
 };
 
 function App() {
-  // Navigation & 4-Step Journey State
-  // Steps: 1 = Account, 2 = Preferences, 3 = Scan, 4 = Results
-  const [currentStep, setCurrentStep] = useState(3);
-  const [currentView, setCurrentView] = useState("flow"); // 'flow' | 'history'
+  // Navigation & 5-Step Journey State
+  // Views: 'dashboard' | 'flow' | 'history'
+  // Steps: 1 = Account, 2 = Allergies, 3 = Preferences, 4 = Scan, 5 = Results
+  const [currentView, setCurrentView] = useState("flow");
+  const [currentStep, setCurrentStep] = useState(4);
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Authentication & Dietary Profile
   const [currentUser, setCurrentUser] = useState(null);
@@ -114,10 +118,12 @@ function App() {
         if (data && data.user) {
           setCurrentUser(data.user);
           setDietaryProfile(data.dietary_profile);
+          // Logged-in returning users land on Dashboard
+          setCurrentView("dashboard");
         }
       })
       .catch(() => {
-        // Guest mode
+        // Guest mode - stays on scanner
       });
   }, []);
 
@@ -133,7 +139,7 @@ function App() {
       const data = await analyzePayload(fullPayload);
       setAnalysisResult(data);
       setCurrentView("flow");
-      setCurrentStep(4); // Advance to Step 4: Personalised Results
+      setCurrentStep(5); // Advance to Step 5: Personalised Results
     } catch (err) {
       console.error("Analysis failure:", err);
       const msg =
@@ -147,24 +153,34 @@ function App() {
   };
 
   // Handler: OCR processing for camera captures and uploaded images
-  const handleOcrImage = async (imageSrc, isUpload = false) => {
+  const handleOcrImage = async (imageSrc, isUpload = false, ocrConfig = "B") => {
     setLoading(true);
     setErrorMessage("");
     try {
       let ocrInput = imageSrc;
+      let configUsed = ocrConfig;
+      let preprocessingMetrics = null;
 
-      // Attempt OpenCV backend preprocessing (Laplacian blur + CLAHE enhancement)
-      try {
-        const prepRes = await preprocessOcrImage(imageSrc);
-        if (prepRes && prepRes.enhanced_image_base64) {
-          ocrInput = prepRes.enhanced_image_base64;
+      if (ocrConfig === "B") {
+        // Configuration B: Attempt OpenCV backend preprocessing (Laplacian blur + CLAHE + Sharpening)
+        try {
+          const prepRes = await preprocessOcrImage(imageSrc, "B", "best");
+          if (prepRes && prepRes.enhanced_image_base64) {
+            ocrInput = prepRes.enhanced_image_base64;
+            configUsed = prepRes.configuration_used || "B";
+            preprocessingMetrics = prepRes.quality_metrics || null;
+          }
+        } catch (prepErr) {
+          console.warn("Backend OpenCV preprocessing bypassed, using client canvas fallback:", prepErr);
+          ocrInput = await preprocessImageForOcr(imageSrc, isUpload);
+          configUsed = "B (Client Fallback)";
         }
-      } catch (prepErr) {
-        console.warn("Backend OpenCV preprocessing bypassed, using client canvas fallback:", prepErr);
-        ocrInput = await preprocessImageForOcr(imageSrc, isUpload);
+      } else {
+        // Configuration A: Existing OCR directly on original image
+        configUsed = "A (Original)";
       }
 
-      // Perform OCR with Tesseract.js
+      // Perform OCR with Tesseract.js using standard configuration
       const worker = await Tesseract.createWorker("eng", 1);
       await worker.setParameters({
         tessedit_pageseg_mode: "6",
@@ -176,7 +192,7 @@ function App() {
 
       const extracted = res.data.text;
       if (!extracted || !extracted.trim()) {
-        setErrorMessage("No legible text could be recognized. Please ensure label is well-lit and in focus.");
+        setErrorMessage("No legible text could be recognized. Please ensure the packaging label is well-lit and in focus.");
         setLoading(false);
         return;
       }
@@ -189,7 +205,9 @@ function App() {
         product: {
           name: isUpload ? "Uploaded Packaging Scan" : "Live Camera Capture",
           brand: "Scanned Label",
-          category: "Physical Label OCR"
+          category: "Physical Label OCR",
+          ocr_pipeline_config: configUsed,
+          preprocessing_metrics: preprocessingMetrics
         }
       });
     } catch (err) {
@@ -227,97 +245,188 @@ function App() {
     } finally {
       setCurrentUser(null);
       setDietaryProfile(null);
+      setCurrentView("flow");
       setCurrentStep(1);
     }
   };
 
+  const navigateToDashboard = () => {
+    setCurrentView("dashboard");
+    setMobileMenuOpen(false);
+  };
+
+  const navigateToScan = () => {
+    setCurrentView("flow");
+    setCurrentStep(4);
+    setMobileMenuOpen(false);
+  };
+
+  const navigateToAllergies = () => {
+    setCurrentView("flow");
+    setCurrentStep(2);
+    setMobileMenuOpen(false);
+  };
+
+  const navigateToPreferences = () => {
+    setCurrentView("flow");
+    setCurrentStep(3);
+    setMobileMenuOpen(false);
+  };
+
+  const navigateToHistory = () => {
+    setCurrentView("history");
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <div className="app">
-      {/* Navigation Header */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <div
-            className="navbar-brand"
+    <div className="clinical-app-layout">
+      {/* DESKTOP CLINICAL SIDEBAR */}
+      <aside className={`clinical-sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
+        <div className="sidebar-brand-box">
+          <div className="sidebar-logo-circle">
+            <Icon name="shieldCheck" size={24} color="#00454A" />
+          </div>
+          <div className="sidebar-brand-text">
+            <span className="brand-title">Food Label Verification</span>
+            <span className="brand-subtitle">Health-Tech System</span>
+          </div>
+          <button
+            type="button"
+            className="mobile-close-sidebar-btn"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close navigation"
+          >
+            <Icon name="x" size={20} />
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
+          <button
+            type="button"
+            className={`sidebar-nav-item ${currentView === "dashboard" ? "active" : ""}`}
+            onClick={navigateToDashboard}
+          >
+            <Icon name="layoutDashboard" size={18} />
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            type="button"
+            className={`sidebar-nav-item ${currentView === "flow" && currentStep === 3 ? "active" : ""}`}
+            onClick={navigateToPreferences}
+          >
+            <Icon name="sliders" size={18} />
+            <span>Dietary Preferences</span>
+          </button>
+
+          <button
+            type="button"
+            className={`sidebar-nav-item ${currentView === "flow" && currentStep === 2 ? "active" : ""}`}
+            onClick={navigateToAllergies}
+          >
+            <Icon name="shieldAlert" size={18} />
+            <span>Food Allergies</span>
+          </button>
+
+          <button
+            type="button"
+            className={`sidebar-nav-item ${currentView === "flow" && currentStep === 4 ? "active" : ""}`}
+            onClick={navigateToScan}
+          >
+            <Icon name="camera" size={18} />
+            <span>Scan Product</span>
+          </button>
+
+          <button
+            type="button"
+            className={`sidebar-nav-item ${currentView === "history" ? "active" : ""}`}
+            onClick={navigateToHistory}
+          >
+            <Icon name="history" size={18} />
+            <span>Scan History</span>
+          </button>
+
+          <button
+            type="button"
+            className="sidebar-nav-item"
             onClick={() => {
-              setCurrentView("flow");
-              setCurrentStep(analysisResult ? 4 : 3);
+              setShowAuditModal(true);
+              setMobileMenuOpen(false);
             }}
           >
-            <div className="brand-icon-wrapper">
-              <Icon name="shieldCheck" size={24} color="#059669" />
+            <Icon name="clipboardList" size={18} />
+            <span>HITL Audit</span>
+          </button>
+        </nav>
+
+        {/* Sidebar Footer User Card */}
+        <div className="sidebar-user-footer">
+          {currentUser ? (
+            <div className="sidebar-user-card">
+              <div className="sidebar-avatar">
+                <Icon name="user" size={16} color="#00454A" />
+              </div>
+              <div className="sidebar-user-info">
+                <strong className="sidebar-user-name">{currentUser.username}</strong>
+                <span className="sidebar-user-preset">
+                  {dietaryProfile?.preset_name ? dietaryProfile.preset_name.replace("_", " ") : "Custom"}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="sidebar-logout-btn"
+                onClick={handleSignOut}
+                title="Sign out"
+              >
+                <Icon name="logOut" size={14} />
+              </button>
             </div>
-            <div>
-              <span className="brand-name">Food Label Verification System</span>
-              <span className="brand-tagline">Multimodal Deep Learning & Dietary Verification</span>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline btn-block btn-sm"
+              onClick={() => {
+                setCurrentView("flow");
+                setCurrentStep(1);
+                setMobileMenuOpen(false);
+              }}
+            >
+              <Icon name="user" size={14} />
+              <span>Sign In / Register</span>
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="clinical-main-wrapper">
+        {/* Top Header Bar */}
+        <header className="clinical-top-header">
+          <div className="top-header-left">
+            <button
+              type="button"
+              className="mobile-hamburger-btn"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open navigation menu"
+            >
+              <Icon name="menu" size={22} />
+            </button>
+            <div className="header-status-indicator">
+              <span className="status-dot online" />
+              <span className="header-status-text">System Active</span>
             </div>
           </div>
 
-          <div className="navbar-nav-links">
-            <button
-              type="button"
-              className={`nav-link-btn ${currentView === "flow" && (currentStep === 3 || currentStep === 4) ? "active" : ""}`}
-              onClick={() => {
-                setCurrentView("flow");
-                setCurrentStep(analysisResult ? 4 : 3);
-              }}
-            >
-              <Icon name="camera" size={16} />
-              <span>Scan Product</span>
-            </button>
-
-            <button
-              type="button"
-              className={`nav-link-btn ${currentView === "flow" && currentStep === 2 ? "active" : ""}`}
-              onClick={() => {
-                setCurrentView("flow");
-                setCurrentStep(2);
-              }}
-            >
-              <Icon name="sliders" size={16} />
-              <span>Preferences</span>
-            </button>
-
-            <button
-              type="button"
-              className={`nav-link-btn ${currentView === "history" ? "active" : ""}`}
-              onClick={() => {
-                setCurrentView("history");
-              }}
-            >
-              <Icon name="history" size={16} />
-              <span>History</span>
-            </button>
-
-            <button
-              type="button"
-              className="nav-link-btn"
-              onClick={() => setShowAuditModal(true)}
-              title="Human-in-the-Loop review queue for unmapped additives"
-            >
-              <Icon name="clipboardList" size={16} />
-              <span>HITL Audit</span>
-            </button>
-          </div>
-
-          <div className="navbar-user-actions">
+          <div className="top-header-right">
             {currentUser ? (
-              <div className="user-badge-pill">
-                <Icon name="user" size={15} color="#059669" />
+              <div className="header-user-badge">
+                <Icon name="shieldCheck" size={14} color="#00454A" />
                 <span>{currentUser.username}</span>
                 {dietaryProfile?.preset_name && (
-                  <span className="user-preset-badge">
+                  <span className="header-preset-chip">
                     {dietaryProfile.preset_name.replace("_", " ")}
                   </span>
                 )}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={handleSignOut}
-                  title="Sign out of account"
-                  style={{ padding: "0.15rem 0.35rem", marginLeft: "0.25rem" }}
-                >
-                  <Icon name="logOut" size={14} />
-                </button>
               </div>
             ) : (
               <button
@@ -333,153 +442,232 @@ function App() {
               </button>
             )}
           </div>
-        </div>
-      </nav>
+        </header>
 
-      {/* Global Error Banner */}
-      {errorMessage && (
-        <div style={{ maxWidth: 1200, margin: "1rem auto 0 auto", padding: "0 1.5rem" }}>
-          <div className="alert-banner alert-danger">
-            <Icon name="alertTriangle" size={18} />
-            <span style={{ flex: 1 }}>{errorMessage}</span>
-            <button
-              type="button"
-              onClick={() => setErrorMessage("")}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "inherit" }}
-            >
-              <Icon name="x" size={16} />
-            </button>
+        {/* Global Error Alert Banner */}
+        {errorMessage && (
+          <div className="global-error-wrap">
+            <div className="alert-banner alert-danger">
+              <Icon name="alertTriangle" size={18} />
+              <span style={{ flex: 1 }}>{errorMessage}</span>
+              <button
+                type="button"
+                onClick={() => setErrorMessage("")}
+                className="alert-dismiss-btn"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* 4-Step Workflow Progress Indicator */}
-      {currentView === "flow" && (
-        <StepProgressBar
-          currentStep={currentStep}
-          onSelectStep={(stepNum) => setCurrentStep(stepNum)}
-          currentUser={currentUser}
-        />
-      )}
-
-      {/* Main Dynamic View Content */}
-      <main className="main-content">
-        {currentView === "history" ? (
-          <AnalysisHistoryView
-            onSelectScanRecord={(record) => {
-              // Convert history record to analysis result format and view in Step 4
-              setAnalysisResult({
-                product: {
-                  name: record.product_name,
-                  brand: record.brand,
-                  ean: record.ean,
-                  category: record.category || "Past Scan Record"
-                },
-                personal_evaluation: {
-                  personal_score: record.personal_score !== undefined ? record.personal_score : record.safety_score,
-                  personal_verdict: record.personal_verdict || "Compatible",
-                  allergen_alerts: record.allergen_alerts || [],
-                  preference_conflicts: record.preference_conflicts || [],
-                  caution_items: record.caution_items || [],
-                  preset_name: record.preset_name || "custom"
-                },
-                safety_indicator: {
-                  final_score: record.safety_score || record.personal_score || 95,
-                  grade: record.grade || "A",
-                  base_baseline_score: 100,
-                  score_deductions: []
-                },
-                system_audit: record.system_audit || {
-                  confidence: {
-                    ocr_confidence: record.ocr_confidence || 1.0,
-                    additive_match_confidence: 1.0,
-                    barcode_decode_status: record.ean ? "valid_ean13" : "not_provided"
-                  }
-                },
-                parsed_additives: record.parsed_additives || []
-              });
-              setCurrentView("flow");
-              setCurrentStep(4);
-            }}
-            onBackToScan={() => {
-              setCurrentView("flow");
-              setCurrentStep(3);
-            }}
-          />
-        ) : (
-          <>
-            {/* STEP 1: ACCOUNT CREATION / LOGIN */}
-            {currentStep === 1 && (
-              <AuthCard
-                currentUser={currentUser}
-                onAuthSuccess={(user, profile) => {
-                  setCurrentUser(user);
-                  setDietaryProfile(profile);
-                  // Advance to Step 2
-                  setCurrentStep(2);
-                }}
-                onContinueAsGuest={() => {
-                  setCurrentStep(2);
-                }}
-                onSignOut={handleSignOut}
-              />
-            )}
-
-            {/* STEP 2: DIETARY PREFERENCE SELECTION */}
-            {currentStep === 2 && (
-              <DietaryPreferencesView
-                currentProfile={dietaryProfile}
-                currentUser={currentUser}
-                onProfileSaved={(prof) => {
-                  setDietaryProfile(prof);
-                }}
-                onProceedToScan={() => {
-                  setCurrentStep(3);
-                }}
-              />
-            )}
-
-            {/* STEP 3: PRODUCT SCANNING */}
-            {currentStep === 3 && (
-              <ProductScanningView
-                loading={loading}
-                dietaryProfile={dietaryProfile}
-                onAnalyzeOcr={handleOcrImage}
-                onAnalyzeBarcode={handleBarcodeAnalyze}
-                onAnalyzeManualText={handleManualTextAnalyze}
-              />
-            )}
-
-            {/* STEP 4: PERSONALISED ANALYSIS RESULTS */}
-            {currentStep === 4 && (
-              <AnalysisResultsView
-                analysisResult={analysisResult}
-                dietaryProfile={dietaryProfile}
-                onScanAnother={() => {
-                  setAnalysisResult(null);
-                  setCurrentStep(3);
-                }}
-                onOpenPreferences={() => {
-                  setCurrentStep(2);
-                }}
-              />
-            )}
-          </>
         )}
-      </main>
 
-      {/* Human-in-the-Loop Audit Queue Modal */}
-      <AuditQueueModal
-        isOpen={showAuditModal}
-        onClose={() => setShowAuditModal(false)}
-      />
+        {/* 5-Step Workflow Progress Indicator */}
+        {currentView === "flow" && (
+          <StepProgressBar
+            currentStep={currentStep}
+            onSelectStep={(stepNum) => setCurrentStep(stepNum)}
+            currentUser={currentUser}
+          />
+        )}
 
-      {/* Footer */}
-      <footer className="main-footer">
-        <p>
-          &copy; {new Date().getFullYear()} Food Label Verification System • Multimodal Deep Learning & Dietary Verification
-        </p>
-      </footer>
+        {/* Dynamic Main Body Content */}
+        <main className="clinical-main-body">
+          {/* VIEW: DASHBOARD */}
+          {currentView === "dashboard" && (
+            <DashboardView
+              currentUser={currentUser}
+              dietaryProfile={dietaryProfile}
+              onNavigateScan={navigateToScan}
+              onNavigateAllergies={navigateToAllergies}
+              onNavigatePreferences={navigateToPreferences}
+              onNavigateHistory={navigateToHistory}
+              onOpenAudit={() => setShowAuditModal(true)}
+              onSelectScanRecord={(record) => {
+                setAnalysisResult({
+                  product: {
+                    name: record.product_name,
+                    brand: record.brand,
+                    ean: record.ean,
+                    category: record.category || "Past Scan Record"
+                  },
+                  personal_evaluation: {
+                    personal_score: record.personal_score !== undefined ? record.personal_score : record.safety_score,
+                    personal_verdict: record.personal_verdict || "Compatible",
+                    allergen_alerts: record.allergen_alerts || [],
+                    preference_conflicts: record.preference_conflicts || [],
+                    caution_items: record.caution_items || [],
+                    preset_name: record.preset_name || "custom"
+                  },
+                  safety_indicator: {
+                    final_score: record.safety_score || record.personal_score || 95,
+                    grade: record.grade || "A",
+                    base_baseline_score: 100,
+                    score_deductions: []
+                  },
+                  system_audit: record.system_audit || {
+                    confidence: {
+                      ocr_confidence: record.ocr_confidence || 1.0,
+                      additive_match_confidence: 1.0,
+                      barcode_decode_status: record.ean ? "valid_ean13" : "not_provided"
+                    }
+                  },
+                  parsed_additives: record.parsed_additives || []
+                });
+                setCurrentView("flow");
+                setCurrentStep(5);
+              }}
+            />
+          )}
+
+          {/* VIEW: SCAN HISTORY */}
+          {currentView === "history" && (
+            <AnalysisHistoryView
+              onSelectScanRecord={(record) => {
+                setAnalysisResult({
+                  product: {
+                    name: record.product_name,
+                    brand: record.brand,
+                    ean: record.ean,
+                    category: record.category || "Past Scan Record"
+                  },
+                  personal_evaluation: {
+                    personal_score: record.personal_score !== undefined ? record.personal_score : record.safety_score,
+                    personal_verdict: record.personal_verdict || "Compatible",
+                    allergen_alerts: record.allergen_alerts || [],
+                    preference_conflicts: record.preference_conflicts || [],
+                    caution_items: record.caution_items || [],
+                    preset_name: record.preset_name || "custom"
+                  },
+                  safety_indicator: {
+                    final_score: record.safety_score || record.personal_score || 95,
+                    grade: record.grade || "A",
+                    base_baseline_score: 100,
+                    score_deductions: []
+                  },
+                  system_audit: record.system_audit || {
+                    confidence: {
+                      ocr_confidence: record.ocr_confidence || 1.0,
+                      additive_match_confidence: 1.0,
+                      barcode_decode_status: record.ean ? "valid_ean13" : "not_provided"
+                    }
+                  },
+                  parsed_additives: record.parsed_additives || []
+                });
+                setCurrentView("flow");
+                setCurrentStep(5);
+              }}
+              onBackToScan={navigateToScan}
+              onBackToDashboard={navigateToDashboard}
+            />
+          )}
+
+          {/* VIEW: 5-STEP JOURNEY FLOW */}
+          {currentView === "flow" && (
+            <>
+              {/* STEP 1: ACCOUNT REGISTRATION / LOGIN */}
+              {currentStep === 1 && (
+                <AuthCard
+                  currentUser={currentUser}
+                  onAuthSuccess={(user, profile, isNewUser) => {
+                    setCurrentUser(user);
+                    setDietaryProfile(profile);
+                    if (isNewUser) {
+                      // New users proceed through onboarding: Step 2 Allergies
+                      setCurrentStep(2);
+                    } else {
+                      // Returning users access dashboard
+                      setCurrentView("dashboard");
+                    }
+                  }}
+                  onContinueAsGuest={() => {
+                    setCurrentStep(2);
+                  }}
+                  onSignOut={handleSignOut}
+                />
+              )}
+
+              {/* STEP 2: FOOD ALLERGY SELECTION */}
+              {currentStep === 2 && (
+                <AllergySelectionView
+                  currentProfile={dietaryProfile}
+                  currentUser={currentUser}
+                  onProfileUpdated={(updatedProfile) => {
+                    setDietaryProfile(updatedProfile);
+                  }}
+                  onContinue={() => {
+                    setCurrentStep(3);
+                  }}
+                  onBack={() => {
+                    if (currentUser) {
+                      setCurrentView("dashboard");
+                    } else {
+                      setCurrentStep(1);
+                    }
+                  }}
+                />
+              )}
+
+              {/* STEP 3: DIETARY PREFERENCES & ADDITIVE AVOIDANCE */}
+              {currentStep === 3 && (
+                <DietaryPreferencesView
+                  currentProfile={dietaryProfile}
+                  currentUser={currentUser}
+                  onProfileSaved={(prof) => {
+                    setDietaryProfile(prof);
+                  }}
+                  onProceedToScan={() => {
+                    setCurrentStep(4);
+                  }}
+                  onBackToAllergies={() => {
+                    setCurrentStep(2);
+                  }}
+                />
+              )}
+
+              {/* STEP 4: SCAN FOOD INGREDIENTS & OPTIONAL BARCODE */}
+              {currentStep === 4 && (
+                <ProductScanningView
+                  loading={loading}
+                  dietaryProfile={dietaryProfile}
+                  onAnalyzeOcr={handleOcrImage}
+                  onAnalyzeBarcode={handleBarcodeAnalyze}
+                  onAnalyzeManualText={handleManualTextAnalyze}
+                />
+              )}
+
+              {/* STEP 5: PERSONALISED ANALYSIS RESULTS */}
+              {currentStep === 5 && (
+                <AnalysisResultsView
+                  analysisResult={analysisResult}
+                  dietaryProfile={dietaryProfile}
+                  onScanAnother={() => {
+                    setAnalysisResult(null);
+                    setCurrentStep(4);
+                  }}
+                  onOpenPreferences={() => {
+                    setCurrentStep(3);
+                  }}
+                  onBackToDashboard={navigateToDashboard}
+                  onViewHistory={navigateToHistory}
+                />
+              )}
+            </>
+          )}
+        </main>
+
+        {/* Human-in-the-Loop Audit Queue Modal */}
+        <AuditQueueModal
+          isOpen={showAuditModal}
+          onClose={() => setShowAuditModal(false)}
+        />
+
+        {/* Clean Application Footer */}
+        <footer className="clinical-main-footer">
+          <div className="footer-content">
+            <span>&copy; {new Date().getFullYear()} Food Label Verification System</span>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }

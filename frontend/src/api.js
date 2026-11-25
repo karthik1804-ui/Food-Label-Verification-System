@@ -268,14 +268,20 @@ export const decodeBarcodeImage = async (formDataOrBase64) => {
 // OCR Preprocessing & Section Extraction
 // -------------------------------------------------------------------------
 
-export const preprocessOcrImage = async (formDataOrBase64) => {
+export const preprocessOcrImage = async (formDataOrBase64, config = "B", variant = "best") => {
   if (formDataOrBase64 instanceof FormData) {
+    if (!formDataOrBase64.has("config")) formDataOrBase64.append("config", config);
+    if (!formDataOrBase64.has("variant")) formDataOrBase64.append("variant", variant);
     const response = await API.post("/api/v1/ocr/preprocess", formDataOrBase64, {
       headers: { "Content-Type": "multipart/form-data" }
     });
     return response.data;
   }
-  const response = await API.post("/api/v1/ocr/preprocess", { image_base64: formDataOrBase64 });
+  const response = await API.post("/api/v1/ocr/preprocess", {
+    image_base64: formDataOrBase64,
+    config,
+    variant
+  });
   return response.data;
 };
 
@@ -284,6 +290,21 @@ export const extractIngredientSection = async (text, ocrConfidence = 1.0) => {
     text,
     ocr_confidence: ocrConfidence
   });
+  return response.data;
+};
+
+export const compareOcr = async (payload) => {
+  const response = await API.post("/api/v1/ocr/compare", payload);
+  return response.data;
+};
+
+export const fetchOcrBenchmark = async () => {
+  const response = await API.get("/api/v1/ocr/benchmark");
+  return response.data;
+};
+
+export const evaluateOcrSample = async (payload) => {
+  const response = await API.post("/api/v1/ocr/evaluate", payload);
   return response.data;
 };
 
@@ -296,6 +317,21 @@ export const parseAdditivesDirect = async (text, ocrConfidence = 1.0) => {
     text,
     ocr_confidence: ocrConfidence
   });
+  return response.data;
+};
+
+// -------------------------------------------------------------------------
+// Machine Learning Ingredient Classification
+// -------------------------------------------------------------------------
+
+export const classifyIngredientML = async (textOrTokens) => {
+  const payload = Array.isArray(textOrTokens) ? { tokens: textOrTokens } : { text: textOrTokens };
+  const response = await API.post("/api/v1/ml/classify", payload);
+  return response.data;
+};
+
+export const fetchMLBenchmark = async () => {
+  const response = await API.get("/api/v1/ml/benchmark");
   return response.data;
 };
 

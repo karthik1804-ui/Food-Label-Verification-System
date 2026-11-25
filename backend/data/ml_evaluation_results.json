@@ -1,0 +1,285 @@
+{
+  "dataset_size": 750,
+  "num_classes": 11,
+  "classes": [
+    "Acidity regulator",
+    "Anti-caking agent",
+    "Antioxidant",
+    "Color",
+    "Emulsifier",
+    "Flavor enhancer",
+    "Other",
+    "Preservative",
+    "Stabilizer",
+    "Sweetener",
+    "Thickener"
+  ],
+  "overall_accuracy": 0.9667,
+  "macro_precision": 0.9734,
+  "macro_recall": 0.9424,
+  "macro_f1": 0.9536,
+  "weighted_f1": 0.9655,
+  "k_fold_scores": [
+    {
+      "fold": 1,
+      "accuracy": 0.9467
+    },
+    {
+      "fold": 2,
+      "accuracy": 0.9467
+    },
+    {
+      "fold": 3,
+      "accuracy": 0.9733
+    },
+    {
+      "fold": 4,
+      "accuracy": 0.9867
+    },
+    {
+      "fold": 5,
+      "accuracy": 0.98
+    }
+  ],
+  "classification_report": {
+    "Acidity regulator": {
+      "precision": 0.925,
+      "recall": 0.9736842105263158,
+      "f1-score": 0.9487179487179487,
+      "support": 114.0
+    },
+    "Anti-caking agent": {
+      "precision": 1.0,
+      "recall": 0.9555555555555556,
+      "f1-score": 0.9772727272727273,
+      "support": 45.0
+    },
+    "Antioxidant": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 60.0
+    },
+    "Color": {
+      "precision": 0.9836065573770492,
+      "recall": 1.0,
+      "f1-score": 0.9917355371900827,
+      "support": 120.0
+    },
+    "Emulsifier": {
+      "precision": 0.9230769230769231,
+      "recall": 1.0,
+      "f1-score": 0.96,
+      "support": 84.0
+    },
+    "Flavor enhancer": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 60.0
+    },
+    "Other": {
+      "precision": 1.0,
+      "recall": 0.8148148148148148,
+      "f1-score": 0.8979591836734694,
+      "support": 54.0
+    },
+    "Preservative": {
+      "precision": 0.9795918367346939,
+      "recall": 1.0,
+      "f1-score": 0.9896907216494846,
+      "support": 96.0
+    },
+    "Stabilizer": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 24.0
+    },
+    "Sweetener": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 48.0
+    },
+    "Thickener": {
+      "precision": 0.8958333333333334,
+      "recall": 0.9555555555555556,
+      "f1-score": 0.9247311827956989,
+      "support": 45.0
+    },
+    "accuracy": 0.9666666666666667,
+    "macro avg": {
+      "precision": 0.9733735136838182,
+      "recall": 0.9423888002835372,
+      "f1-score": 0.9536461182999464,
+      "support": 750.0
+    },
+    "weighted avg": {
+      "precision": 0.968499419666984,
+      "recall": 0.9666666666666667,
+      "f1-score": 0.9654565223552709,
+      "support": 750.0
+    }
+  },
+  "confusion_matrix": {
+    "classes": [
+      "Acidity regulator",
+      "Anti-caking agent",
+      "Antioxidant",
+      "Color",
+      "Emulsifier",
+      "Flavor enhancer",
+      "Other",
+      "Preservative",
+      "Stabilizer",
+      "Sweetener",
+      "Thickener"
+    ],
+    "matrix": [
+      [
+        111,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        43,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        120,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        84,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        6,
+        0,
+        0,
+        0,
+        2,
+        0,
+        44,
+        2,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        96,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        16,
+        0,
+        5
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        48,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        43
+      ]
+    ]
+  }
+}

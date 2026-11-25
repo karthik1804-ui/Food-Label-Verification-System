@@ -20,6 +20,7 @@ export default function AnalysisResultsView({
   const safetyIndicator = analysisResult.safety_indicator || analysisResult.safety_scoring || {};
   const systemAudit = analysisResult.system_audit || {};
   const parsedAdditives = analysisResult.parsed_additives || [];
+  const mlClassifications = analysisResult.ml_classifications || [];
   const counterfactual = analysisResult.counterfactual_explanation || {};
 
   const detectedCategories = Array.from(
@@ -315,6 +316,17 @@ export default function AnalysisResultsView({
             </button>
           )}
 
+          {mlClassifications && mlClassifications.length > 0 && (
+            <button
+              type="button"
+              className={`results-tab ${activeTab === "ml_inferred" ? "active" : ""}`}
+              onClick={() => setActiveTab("ml_inferred")}
+            >
+              <Icon name="sparkles" size={15} />
+              <span>ML Inferred ({mlClassifications.length})</span>
+            </button>
+          )}
+
           <button
             type="button"
             className={`results-tab ${activeTab === "rules" ? "active" : ""}`}
@@ -473,6 +485,64 @@ export default function AnalysisResultsView({
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2b: ML INFERRED CANDIDATES (TF-IDF + LOGISTIC REGRESSION) */}
+        {activeTab === "ml_inferred" && (
+          <div className="tab-pane-content">
+            <div className="ml-inferred-header" style={{ marginBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#00454A", fontWeight: 700 }}>
+                <Icon name="sparkles" size={18} color="#00454A" />
+                <span>TF-IDF + Logistic Regression Hybrid Inferences</span>
+              </div>
+              <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "#64748B" }}>
+                Unmapped candidates from packaging evaluated via statistical ML inference when exact INS taxonomy matches were unavailable:
+              </p>
+            </div>
+
+            <div className="clinical-ingredients-table-wrap">
+              <table className="clinical-table">
+                <thead>
+                  <tr>
+                    <th>Unmapped Token</th>
+                    <th>Predicted Category</th>
+                    <th>ML Confidence</th>
+                    <th>Decision Status</th>
+                    <th>Top Contributing Terms</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mlClassifications.map((item, idx) => (
+                    <tr key={idx}>
+                      <td>
+                        <strong>{item.token}</strong>
+                      </td>
+                      <td>
+                        <span className="fc-chip">{item.category}</span>
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 700, color: item.confidence >= 0.5 ? "#16A34A" : "#D97706" }}>
+                          {Math.round(item.confidence * 100)}%
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-pill ${item.is_confident ? "status-pill-info" : "status-pill-warning"}`}>
+                          {item.is_confident ? "ML Classified" : "Escalated to Review"}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: "0.8rem", color: "#475569" }}>
+                          {item.top_attributions && item.top_attributions.length > 0
+                            ? item.top_attributions.map(a => `${a.token} (${a.weight > 0 ? "+" : ""}${a.weight})`).join(", ")
+                            : "N/A"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

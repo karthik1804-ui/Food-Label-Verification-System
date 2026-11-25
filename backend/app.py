@@ -519,6 +519,7 @@ def analyze_v1():
             "preprocessing_metrics": product_info.get("preprocessing_metrics"),
             "parsed_additives": cleaned_additives,
             "unmapped_tokens": unmapped_tokens,
+            "ml_classifications": parsed_detail.get("ml_classifications", []),
             "safety_indicator": {
                 "final_score":         scoring_res["final_score"],
                 "grade":               scoring_res["grade"],
@@ -1139,6 +1140,72 @@ def parser_parse_endpoint():
     return jsonify({
         "status": "success",
         "result": result
+    }), 200
+
+
+# ---------------------------------------------------------------------------
+# Machine Learning Ingredient Classification Endpoints
+# ---------------------------------------------------------------------------
+
+@app.route("/api/v1/ml/classify", methods=["POST", "OPTIONS"])
+def ml_classify_endpoint():
+    """
+    ML Ingredient Classifier Endpoint (TF-IDF + Logistic Regression):
+    Predicts the functional category, confidence, class probabilities, and
+    top contributing n-gram word weights for candidate ingredients.
+    Accepts:
+      {
+        "text": "artificial red dye",          // single text string
+        "tokens": ["red dye", "benzoic acid"]  // or list of candidate tokens
+      }
+    """
+    if request.method == "OPTIONS":
+        return "", 200
+
+    from services.ml_classifier import get_ml_classifier, classify_ingredient_hybrid
+
+    body = request.get_json(silent=True) or {}
+    tokens = body.get("tokens")
+    single_text = body.get("text") or body.get("ingredient")
+
+    classifier = get_ml_classifier()
+
+    if tokens and isinstance(tokens, list):
+        results = [classify_ingredient_hybrid(t) for t in tokens]
+        return jsonify({
+            "status": "success",
+            "results": results,
+            "total_processed": len(results)
+        }), 200
+
+    if single_text:
+        pred = classify_ingredient_hybrid(single_text)
+        return jsonify({
+            "status": "success",
+            "result": pred
+        }), 200
+
+    return jsonify({
+        "status": "error",
+        "message": "Provide either 'text' string or 'tokens' list"
+    }), 400
+
+
+@app.route("/api/v1/ml/benchmark", methods=["GET", "OPTIONS"])
+def ml_benchmark_endpoint():
+    """
+    Returns cross-validation accuracy, trained classes, and sample metrics
+    for the TF-IDF Logistic Regression model.
+    """
+    if request.method == "OPTIONS":
+        return "", 200
+
+    from services.ml_classifier import get_ml_classifier
+    classifier = get_ml_classifier()
+    metrics = classifier.train(save_cache=True)
+    return jsonify({
+        "status": "success",
+        "metrics": metrics
     }), 200
 
 

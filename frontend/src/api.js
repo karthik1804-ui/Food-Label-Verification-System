@@ -321,6 +321,21 @@ export const parseAdditivesDirect = async (text, ocrConfidence = 1.0) => {
 };
 
 // -------------------------------------------------------------------------
+// Machine Learning Ingredient Classification
+// -------------------------------------------------------------------------
+
+export const classifyIngredientML = async (textOrTokens) => {
+  const payload = Array.isArray(textOrTokens) ? { tokens: textOrTokens } : { text: textOrTokens };
+  const response = await API.post("/api/v1/ml/classify", payload);
+  return response.data;
+};
+
+export const fetchMLBenchmark = async () => {
+  const response = await API.get("/api/v1/ml/benchmark");
+  return response.data;
+};
+
+// -------------------------------------------------------------------------
 // Health check
 // -------------------------------------------------------------------------
 
